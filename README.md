@@ -1,6 +1,6 @@
-# NEE — Near-Earth Encounter System Visualizer
+# Earth Sentry — Object Encounter System
 
-A live 3D visualizer for near-Earth "space traffic": Earth, the Moon, the Sun, a
+A live 3D monitor for near-Earth object encounters: Earth, the Moon, the Sun, a
 starfield, and real close-approach objects (NEOs) streamed from public NASA/JPL
 APIs — rendered in **raw WebGL2** and wrapped in a **retro-futurism × gorpcore**
 mission-control HUD.
@@ -95,6 +95,25 @@ See `src/scene/scale.ts`.
   against the sim clock, draw true orbit paths + inner planets, and an
   "approximate ↔ real" toggle. (`orbital/kepler.ts` already implements the
   solver, propagation, and orbit sampling.)
+- **Phase 3 — space-infrastructure layer (planned):** render Earth-orbit traffic
+  alongside the NEO layer.
+  - **Incoming objects** — highlight/animate NEOs on approach toward Earth as the
+    sim clock advances (trajectory tails, closest-approach countdown).
+  - **~15,000 active satellites** — full active catalog as an instanced point
+    cloud, propagated live.
+  - **Starlink swarms** — the Starlink group, rendered as distinct shells/trains.
+  - **GPS constellation** — the GPS operational group in MEO (~4.2 Earth radii).
+  - **International Space Station** — ISS (NORAD 25544) as a labeled, focusable
+    object with a live ground track.
+
+  **Data + method:** TLE/GP element sets from **CelesTrak**
+  (`https://celestrak.org/NORAD/elements/gp.php?GROUP=<active|starlink|gps-ops|stations>&FORMAT=json`),
+  propagated with **SGP4** (via `satellite.js`) against the sim clock. This is a
+  separate pipeline from the NEO/Kepler layer: satellites live in the near-Earth
+  shell (LEO ≈ 1.03–1.3, MEO/GPS ≈ 4.2 Earth radii) and are best shown at
+  near-real scale. Rendering ~15k points needs an instanced buffer updated on a
+  worker or throttled cadence. **CORS:** CelesTrak may need the same proxy
+  treatment as JPL (add a `/celestrak` dev proxy if so).
 
 ## Credits
 

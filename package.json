@@ -1,9 +1,9 @@
 {
-  "name": "near-earth-encounters",
+  "name": "earth-sentry",
   "private": true,
   "version": "0.1.0",
   "type": "module",
-  "description": "Near-Earth Encounter System Visualizer — live NASA/JPL space-traffic in a raw-WebGL scene with a retro-futurism x gorpcore HUD.",
+  "description": "Earth Sentry — Object Encounter System. Live NASA/JPL near-Earth object encounters in a raw-WebGL scene with a retro-futurism x gorpcore HUD.",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",

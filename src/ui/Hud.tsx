@@ -16,11 +16,11 @@ export function Hud({ loading, error, total, hazardCount }: Props) {
       transition={{ type: "spring", stiffness: 260, damping: 26 }}
     >
       <div className="panel-head">
-        <span>NEE // Near-Earth Encounter Sys</span>
+        <span>EARTH SENTRY // OBJECT ENCOUNTER SYS</span>
         <span>{loading ? <span className="loading-dot">● LINK</span> : <span className="live">● LIVE</span>}</span>
       </div>
       <div className="panel-body">
-        <h1>ORBITAL TRAFFIC WATCH</h1>
+        <h1>OBJECT ENCOUNTER MONITOR</h1>
         <div className="sub">SRC · JPL/CNEOS CAD + NASA NEOWS</div>
         <div className="stat-row">
           <div className="stat">
