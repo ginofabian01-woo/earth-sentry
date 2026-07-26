@@ -70,7 +70,8 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
     return () => {
       canvas.removeEventListener("pointerdown", onDown);
       canvas.removeEventListener("pointerup", onUp);
-      renderer.dispose();
+      renderer.dispose(); // stops the RAF loop first
+      scene.dispose();
       rendererRef.current = null;
       sceneRef.current = null;
     };

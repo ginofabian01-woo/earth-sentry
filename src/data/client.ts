@@ -3,6 +3,7 @@
 // cache them too so timeline scrubbing doesn't refetch.
 
 const memory = new Map<string, { at: number; data: unknown }>();
+const inflight = new Map<string, Promise<unknown>>();
 const LS_PREFIX = "nee:cache:";
 
 export const NASA_KEY = import.meta.env.VITE_NASA_API_KEY || "DEMO_KEY";
@@ -51,18 +52,32 @@ export async function fetchJson<T>(url: string, opts: FetchOpts = {}): Promise<T
     return ls.data as T;
   }
 
-  const res = await fetch(url, { headers: { Accept: "application/json" } });
-  if (!res.ok) {
-    // On failure, fall back to any stale cache rather than blanking the UI.
-    if (mem) return mem.data as T;
-    if (ls) return ls.data as T;
-    throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`);
+  // Dedupe concurrent identical requests (e.g. StrictMode double-effects) so we
+  // don't burn duplicate network calls / DEMO_KEY budget on the same URL.
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<T>;
+
+  const request = (async () => {
+    const res = await fetch(url, { headers: { Accept: "application/json" } });
+    if (!res.ok) {
+      // On failure, fall back to any stale cache rather than blanking the UI.
+      if (mem) return mem.data as T;
+      if (ls) return ls.data as T;
+      throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`);
+    }
+    const data = (await res.json()) as T;
+    const entry = { at: Date.now(), data };
+    memory.set(key, entry);
+    lsSet(key, entry);
+    return data;
+  })();
+
+  inflight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    inflight.delete(key);
   }
-  const data = (await res.json()) as T;
-  const entry = { at: now, data };
-  memory.set(key, entry);
-  lsSet(key, entry);
-  return data;
 }
 
 /** True if this exact request is already cached and fresh (for status UI). */

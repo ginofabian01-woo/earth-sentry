@@ -55,6 +55,16 @@ export class Bodies {
     vec3.scale(this.sunPos, this.sunDir, SCENE.SUN_DISTANCE);
   }
 
+  dispose() {
+    const gl = this.gl;
+    gl.deleteProgram(this.planetProg);
+    gl.deleteProgram(this.sunProg);
+    gl.deleteProgram(this.starProg);
+    gl.deleteVertexArray(this.sphere.vao);
+    gl.deleteVertexArray(this.stars.vao);
+    gl.deleteTexture(this.earthTex);
+  }
+
   drawStars(view: mat4, proj: mat4, time: number) {
     const gl = this.gl;
     gl.useProgram(this.starProg);

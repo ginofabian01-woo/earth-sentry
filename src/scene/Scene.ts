@@ -138,6 +138,13 @@ export class Scene {
     }
   };
 
+  /** Free all GL resources owned by the scene. */
+  dispose() {
+    this.bodies.dispose();
+    this.markers.dispose();
+    this.orbits.dispose();
+  }
+
   /** Render markers to the pick target and resolve the object under a click. */
   pickAt(cssX: number, cssY: number): number {
     const r = this.renderer;

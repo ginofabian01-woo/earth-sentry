@@ -99,6 +99,13 @@ export class Markers {
     return idx >= 0 && idx < this.count ? idx : -1;
   }
 
+  dispose() {
+    const gl = this.gl;
+    gl.deleteVertexArray(this.vao);
+    gl.deleteBuffer(this.instanceBuf);
+    gl.deleteProgram(this.prog);
+  }
+
   draw(view: mat4, proj: mat4, time: number, pickMode: boolean) {
     if (this.count === 0) return;
     const gl = this.gl;
