@@ -72,9 +72,14 @@ export class Bodies {
   }
 
   drawSun(view: mat4, proj: mat4, camPos: vec3, time: number) {
+    this.drawSunAt(view, proj, camPos, time, this.sunPos, SCENE.SUN_RADIUS);
+  }
+
+  /** Emissive Sun sphere at an arbitrary center/radius (used in helio mode). */
+  drawSunAt(view: mat4, proj: mat4, camPos: vec3, time: number, center: vec3, radius: number) {
     const gl = this.gl;
-    mat4.fromTranslation(this.model, this.sunPos);
-    mat4.scale(this.model, this.model, [SCENE.SUN_RADIUS, SCENE.SUN_RADIUS, SCENE.SUN_RADIUS]);
+    mat4.fromTranslation(this.model, center);
+    mat4.scale(this.model, this.model, [radius, radius, radius]);
     gl.useProgram(this.sunProg);
     gl.uniformMatrix4fv(this.sunU.uModel, false, this.model);
     gl.uniformMatrix4fv(this.sunU.uView, false, view);
@@ -86,11 +91,26 @@ export class Bodies {
     gl.bindVertexArray(null);
   }
 
+  /** Generic lit sphere (a planet body) with a per-call sun direction. */
+  drawBody(
+    view: mat4, proj: mat4, camPos: vec3,
+    center: vec3, radius: number, spin: number,
+    colorA: [number, number, number], colorB: [number, number, number],
+    tex: WebGLTexture | null, ambient: number, sunDir: vec3,
+  ) {
+    this.drawSphere(view, proj, camPos, center, radius, spin, colorA, colorB, tex, ambient, 0, sunDir);
+  }
+
+  get earthTexture() {
+    return this.earthTex;
+  }
+
   private drawSphere(
     view: mat4, proj: mat4, camPos: vec3,
     center: vec3, radius: number, spin: number,
     colorA: [number, number, number], colorB: [number, number, number],
     tex: WebGLTexture | null, ambient: number, rim: number,
+    sunDir: vec3 = this.sunDir,
   ) {
     const gl = this.gl;
     mat4.fromTranslation(this.model, center);
@@ -103,7 +123,7 @@ export class Bodies {
     gl.uniformMatrix4fv(this.planetU.uView, false, view);
     gl.uniformMatrix4fv(this.planetU.uProj, false, proj);
     gl.uniformMatrix3fv(this.planetU.uNormalMat, false, this.normalMat);
-    gl.uniform3fv(this.planetU.uSunDir, this.sunDir);
+    gl.uniform3fv(this.planetU.uSunDir, sunDir);
     gl.uniform3fv(this.planetU.uCamPos, camPos);
     gl.uniform3fv(this.planetU.uColorA, colorA);
     gl.uniform3fv(this.planetU.uColorB, colorB);

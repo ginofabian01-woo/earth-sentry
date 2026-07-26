@@ -8,7 +8,8 @@ import { Controls } from "./ui/Controls";
 import { ObjectInspector } from "./ui/ObjectInspector";
 import { fetchCloseApproaches } from "./data/jplCad";
 import { fetchObjectDetail } from "./data/jplSbdb";
-import type { CloseApproach, ObjectDetail } from "./data/types";
+import type { CloseApproach, ObjectDetail, OrbitalElements } from "./data/types";
+import type { SceneMode } from "./scene/Scene";
 import { addDays, isoDate } from "./orbital/time";
 import "./ui/hud.css";
 
@@ -19,6 +20,8 @@ export default function App() {
   const [spanDays, setSpanDays] = useState(30);
   const [distMaxLd, setDistMaxLd] = useState(20);
   const [scanlines, setScanlines] = useState(true);
+  const [mode, setMode] = useState<SceneMode>("approx");
+  const [realElements, setRealElements] = useState<(OrbitalElements | null)[]>([]);
 
   const [approaches, setApproaches] = useState<CloseApproach[]>([]);
   const [loading, setLoading] = useState(true);
@@ -76,6 +79,25 @@ export default function App() {
     };
   }, [selectedIndex, approaches]);
 
+  // load real orbital elements for in-window objects when heliocentric mode is on
+  useEffect(() => {
+    if (mode !== "real" || approaches.length === 0) {
+      setRealElements([]);
+      return;
+    }
+    let cancelled = false;
+    const subset = approaches.slice(0, 24); // cap SBDB lookups
+    Promise.all(
+      subset.map((ca) => fetchObjectDetail(ca.des).then((d) => d.elements ?? null).catch(() => null)),
+    ).then((els) => {
+      if (cancelled) return;
+      setRealElements(approaches.map((_, i) => (i < els.length ? els[i] : null)));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [mode, approaches]);
+
   const selected = approaches[selectedIndex] ?? null;
   const hazardCount = useMemo(() => approaches.filter((a) => a.hazardous).length, [approaches]);
   const nearFocus = useMemo(
@@ -85,10 +107,20 @@ export default function App() {
 
   return (
     <>
-      <GLCanvas ref={glRef} approaches={approaches} selectedIndex={selectedIndex} onSelect={setSelectedIndex} />
+      <GLCanvas
+        ref={glRef}
+        approaches={approaches}
+        selectedIndex={selectedIndex}
+        onSelect={setSelectedIndex}
+        mode={mode}
+        simDate={focusDate}
+        realElements={realElements}
+      />
       <Hud loading={loading} error={error} total={approaches.length} hazardCount={hazardCount} />
       <Legend />
       <Controls
+        mode={mode}
+        onMode={setMode}
         distMaxLd={distMaxLd}
         onDistMax={setDistMaxLd}
         scanlines={scanlines}

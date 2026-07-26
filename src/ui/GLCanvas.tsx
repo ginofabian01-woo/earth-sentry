@@ -1,7 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Renderer } from "../gl/renderer";
-import { Scene } from "../scene/Scene";
-import type { CloseApproach } from "../data/types";
+import { Scene, type SceneMode } from "../scene/Scene";
+import { SCENE } from "../scene/scale";
+import type { CloseApproach, OrbitalElements } from "../data/types";
 
 export interface GLCanvasHandle {
   resetView: () => void;
@@ -11,6 +12,9 @@ interface Props {
   approaches: CloseApproach[];
   selectedIndex: number;
   onSelect: (index: number) => void;
+  mode: SceneMode;
+  simDate: Date;
+  realElements: (OrbitalElements | null)[];
 }
 
 /**
@@ -19,7 +23,7 @@ interface Props {
  * refs so React re-renders never touch the hot path.
  */
 export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
-  { approaches, selectedIndex, onSelect },
+  { approaches, selectedIndex, onSelect, mode, simDate, realElements },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -27,13 +31,14 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
   const sceneRef = useRef<Scene | null>(null);
   const onSelectRef = useRef(onSelect);
   onSelectRef.current = onSelect;
+  const modeRef = useRef(mode);
+  modeRef.current = mode;
+
+  const framedFor = (m: SceneMode) => (m === "real" ? SCENE.HELIO_CAM_RADIUS : 9);
 
   useImperativeHandle(ref, () => ({
     resetView() {
-      const cam = rendererRef.current?.camera;
-      if (cam) {
-        cam.frame(9);
-      }
+      rendererRef.current?.camera.frame(framedFor(modeRef.current));
     },
   }));
 
@@ -43,7 +48,7 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
     try {
       renderer = new Renderer(canvas);
     } catch (err) {
-      console.error("[nee] renderer init failed", err);
+      console.error("[earth-sentry] renderer init failed", err);
       return;
     }
     const scene = new Scene(renderer);
@@ -54,8 +59,7 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
     let downX = 0, downY = 0;
     const onDown = (e: PointerEvent) => { downX = e.clientX; downY = e.clientY; };
     const onUp = (e: PointerEvent) => {
-      // treat as a click only if the pointer barely moved (not a drag/orbit)
-      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return;
+      if (Math.hypot(e.clientX - downX, e.clientY - downY) > 5) return; // ignore drags
       const rect = canvas.getBoundingClientRect();
       const idx = scene.pickAt(e.clientX - rect.left, e.clientY - rect.top);
       onSelectRef.current(idx);
@@ -75,6 +79,19 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
   useEffect(() => {
     sceneRef.current?.setApproaches(approaches);
   }, [approaches]);
+
+  useEffect(() => {
+    sceneRef.current?.setRealElements(realElements);
+  }, [realElements]);
+
+  useEffect(() => {
+    sceneRef.current?.setSimDate(simDate);
+  }, [simDate]);
+
+  useEffect(() => {
+    sceneRef.current?.setMode(mode);
+    rendererRef.current?.camera.frame(framedFor(mode));
+  }, [mode]);
 
   useEffect(() => {
     sceneRef.current?.select(selectedIndex);

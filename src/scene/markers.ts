@@ -48,21 +48,32 @@ export class Markers {
     gl.bindVertexArray(null);
   }
 
-  setData(approaches: CloseApproach[]) {
+  /**
+   * Upload marker instances. In approximate mode positions are derived from miss
+   * distance; in real mode pass `positions` aligned to `approaches` (null hides
+   * that marker) so selection indices stay consistent across modes.
+   */
+  setData(
+    approaches: CloseApproach[],
+    opts: { positions?: (vec3 | null)[]; baseSize?: number } = {},
+  ) {
     const gl = this.gl;
     this.approaches = approaches;
     this.count = approaches.length;
     this.positions.length = 0;
     this.selectedIndex = -1;
+    const baseSize = opts.baseSize ?? SCENE.MARKER_BASE_SIZE;
 
     const arr = new Float32Array(this.count * FLOATS_PER);
     for (let i = 0; i < this.count; i++) {
       const ca = approaches[i];
-      const p = approximatePosition(ca);
+      const override = opts.positions ? opts.positions[i] : undefined;
+      const hidden = opts.positions && !override;
+      const p = override ?? approximatePosition(ca);
       this.positions.push(vec3.clone(p));
 
       const sizeScale = Math.min(3, Math.max(0.5, 0.5 + Math.log10(Math.max(1, ca.diameterM)) / 3));
-      const size = SCENE.MARKER_BASE_SIZE * sizeScale;
+      const size = hidden ? 0 : baseSize * sizeScale;
       const color = ca.hazardous ? HAZARD_COLOR : SAFE_COLOR;
 
       // pick id = index + 1 encoded into RGB

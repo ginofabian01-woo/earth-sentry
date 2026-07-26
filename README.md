@@ -91,10 +91,12 @@ See `src/scene/scale.ts`.
 
 - **Phase 1 (done):** raw-WebGL scene, live CAD feed, approximate marker
   placement, HUD, timeline, picking + dossier.
-- **Phase 2 (planned):** real Keplerian orbits — propagate SBDB/NeoWs elements
-  against the sim clock, draw true orbit paths + inner planets, and an
-  "approximate ↔ real" toggle. (`orbital/kepler.ts` already implements the
-  solver, propagation, and orbit sampling.)
+- **Phase 2 (done):** real Keplerian orbits — a heliocentric "HELIO ORBITS" mode
+  with the Sun, inner planets (Mercury–Mars) on their real orbits, and every
+  in-window NEO drawn with its true orbit ellipse (JPL SBDB elements). Positions
+  propagate against the timeline clock; a GEOCENTRIC ↔ HELIO toggle switches views
+  and reframes the camera. (`orbital/kepler.ts` + `orbital/planets.ts` +
+  `scene/orbits.ts`.)
 - **Phase 3 — space-infrastructure layer (planned):** render Earth-orbit traffic
   alongside the NEO layer.
   - **Incoming objects** — highlight/animate NEOs on approach toward Earth as the

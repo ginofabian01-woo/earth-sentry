@@ -51,8 +51,10 @@ npm run dev        # http://localhost:5173
 
 - **Phase 1 (done):** raw-WebGL scene, live CAD feed, approximate markers, HUD,
   timeline, picking + dossier.
-- **Phase 2:** real Keplerian orbit paths propagated vs the sim clock, inner
-  planets, approximate↔real toggle (wire `orbital/kepler.ts` into `scene/orbits.ts`).
+- **Phase 2 (done):** heliocentric "HELIO ORBITS" mode — Sun + inner planets +
+  true NEO orbit ellipses (SBDB elements), positions propagated vs the timeline
+  clock, GEOCENTRIC↔HELIO toggle with camera reframe. See `orbital/planets.ts`,
+  `scene/orbits.ts`, and the mode branch in `scene/Scene.ts`.
 - **Phase 3 — space-infrastructure layer:** incoming-object animation, ~15k
   active satellites, Starlink swarms, GPS constellation, ISS + ground track.
   Data via **CelesTrak** TLE/GP sets, propagated with **SGP4 (`satellite.js`)** —

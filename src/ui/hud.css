@@ -93,7 +93,7 @@
 .legend .dot.haz { background: var(--hazard); box-shadow: 0 0 6px color-mix(in srgb, var(--hazard) 70%, transparent); }
 
 /* ---- object inspector (right) ---- */
-.inspector { top: 200px; right: var(--hud-pad); width: 258px; max-height: calc(100vh - 340px); overflow: auto; }
+.inspector { top: 262px; right: var(--hud-pad); width: 258px; max-height: calc(100vh - 400px); overflow: auto; }
 .inspector .name { font-size: 13px; color: var(--ink); letter-spacing: 0.04em; }
 .inspector .des { font-size: 10px; color: var(--accent); letter-spacing: 0.14em; margin-top: 2px; }
 .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; padding: 5px 0; border-bottom: 1px dashed color-mix(in srgb, var(--panel-line) 60%, transparent); }

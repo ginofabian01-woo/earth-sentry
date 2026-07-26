@@ -1,26 +1,109 @@
+import { vec3 } from "gl-matrix";
 import { Renderer } from "../gl/renderer";
 import { Bodies } from "./bodies";
 import { Markers } from "./markers";
-import type { CloseApproach } from "../data/types";
+import { Orbits, type OrbitSpec } from "./orbits";
+import { SCENE } from "./scale";
+import { PLANETS, EARTH_INDEX } from "../orbital/planets";
+import { elementsToPosition, sampleOrbit } from "../orbital/kepler";
+import type { CloseApproach, OrbitalElements } from "../data/types";
+
+export type SceneMode = "approx" | "real";
 
 /** Owns all drawables and the per-frame draw order + picking. */
 export class Scene {
   readonly renderer: Renderer;
   private bodies: Bodies;
   readonly markers: Markers;
+  private orbits: Orbits;
+
+  private mode: SceneMode = "approx";
+  private simDate = new Date();
+  private approaches: CloseApproach[] = [];
+  private neoElements: (OrbitalElements | null)[] = [];
+
+  private readonly planetOrbitSpecs: OrbitSpec[];
+  private neoOrbitSpecs: OrbitSpec[] = [];
+  private planetPositions: vec3[] = PLANETS.map(() => vec3.create());
+  private readonly tmp = vec3.create();
+  private readonly origin = vec3.create();
 
   constructor(renderer: Renderer) {
     this.renderer = renderer;
     this.bodies = new Bodies(renderer.gl);
     this.markers = new Markers(renderer.gl);
+    this.orbits = new Orbits(renderer.gl);
+
+    // planet orbit rings are static
+    this.planetOrbitSpecs = PLANETS.map((p) => ({
+      points: sampleOrbit(p.el, 256),
+      color: p.ringColor,
+      alpha: 0.5,
+    }));
+  }
+
+  setMode(mode: SceneMode) {
+    if (mode === this.mode) return;
+    this.mode = mode;
+    this.rebuildOrbits();
+    this.updatePositions();
+  }
+
+  setSimDate(date: Date) {
+    this.simDate = date;
+    if (this.mode === "real") this.updatePositions();
   }
 
   setApproaches(list: CloseApproach[]) {
-    this.markers.setData(list);
+    this.approaches = list;
+    this.neoElements = list.map(() => null);
+    this.neoOrbitSpecs = [];
+    this.rebuildOrbits();
+    this.updatePositions();
+  }
+
+  /** Real orbital elements aligned to the current approaches (null = unknown). */
+  setRealElements(elements: (OrbitalElements | null)[]) {
+    this.neoElements = elements;
+    this.neoOrbitSpecs = [];
+    for (let i = 0; i < elements.length; i++) {
+      const el = elements[i];
+      if (!el) continue;
+      this.neoOrbitSpecs.push({
+        points: sampleOrbit(el, 220),
+        color: this.approaches[i]?.hazardous ? [1.0, 0.4, 0.35] : [1.0, 0.72, 0.2],
+        alpha: 0.32,
+      });
+    }
+    this.rebuildOrbits();
+    this.updatePositions();
   }
 
   select(index: number) {
     this.markers.selectedIndex = index;
+  }
+
+  /** Rebuild orbit line buffers (only when the object set / mode changes). */
+  private rebuildOrbits() {
+    this.orbits.setOrbits(this.mode === "real" ? [...this.planetOrbitSpecs, ...this.neoOrbitSpecs] : []);
+  }
+
+  /** Recompute body/marker positions for the current date (cheap; per scrub). */
+  private updatePositions() {
+    if (this.mode === "real") {
+      for (let i = 0; i < PLANETS.length; i++) {
+        elementsToPosition(PLANETS[i].el, this.simDate, this.planetPositions[i]);
+        vec3.scale(this.planetPositions[i], this.planetPositions[i], SCENE.AU_UNIT);
+      }
+      const positions: (vec3 | null)[] = this.neoElements.map((el) => {
+        if (!el) return null;
+        const p = elementsToPosition(el, this.simDate, vec3.create());
+        return vec3.scale(p, p, SCENE.AU_UNIT);
+      });
+      this.markers.setData(this.approaches, { positions, baseSize: SCENE.MARKER_BASE_SIZE_HELIO });
+    } else {
+      this.markers.setData(this.approaches);
+    }
   }
 
   render = (_dt: number, elapsed: number) => {
@@ -30,12 +113,29 @@ export class Scene {
     const proj = cam.projMatrix(r.aspect);
 
     r.bindScreen();
-    r.clear(0.043, 0.047, 0.039); // charcoal
+    r.clear(0.043, 0.047, 0.039);
     this.bodies.drawStars(view, proj, elapsed);
-    this.bodies.drawSun(view, proj, cam.position, elapsed);
-    this.bodies.drawEarth(view, proj, cam.position, elapsed);
-    this.bodies.drawMoon(view, proj, cam.position, elapsed);
-    this.markers.draw(view, proj, elapsed, false);
+
+    if (this.mode === "real") {
+      this.bodies.drawSunAt(view, proj, cam.position, elapsed, this.origin, SCENE.SUN_CORE_RADIUS);
+      for (let i = 0; i < PLANETS.length; i++) {
+        const p = PLANETS[i];
+        const pos = this.planetPositions[i];
+        vec3.negate(this.tmp, pos);
+        vec3.normalize(this.tmp, this.tmp); // sun direction (toward origin)
+        this.bodies.drawBody(
+          view, proj, cam.position, pos, p.radiusUnits, elapsed * 0.1,
+          p.colorA, p.colorB, i === EARTH_INDEX ? this.bodies.earthTexture : null, 0.1, this.tmp,
+        );
+      }
+      this.orbits.draw(view, proj, SCENE.AU_UNIT);
+      this.markers.draw(view, proj, elapsed, false);
+    } else {
+      this.bodies.drawSun(view, proj, cam.position, elapsed);
+      this.bodies.drawEarth(view, proj, cam.position, elapsed);
+      this.bodies.drawMoon(view, proj, cam.position, elapsed);
+      this.markers.draw(view, proj, elapsed, false);
+    }
   };
 
   /** Render markers to the pick target and resolve the object under a click. */

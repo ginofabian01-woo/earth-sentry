@@ -1,6 +1,9 @@
 import { motion } from "motion/react";
+import type { SceneMode } from "../scene/Scene";
 
 interface Props {
+  mode: SceneMode;
+  onMode: (m: SceneMode) => void;
   distMaxLd: number;
   onDistMax: (v: number) => void;
   scanlines: boolean;
@@ -10,7 +13,7 @@ interface Props {
 
 const DIST_OPTIONS = [5, 10, 20];
 
-export function Controls({ distMaxLd, onDistMax, scanlines, onScanlines, onReset }: Props) {
+export function Controls({ mode, onMode, distMaxLd, onDistMax, scanlines, onScanlines, onReset }: Props) {
   return (
     <motion.div
       className="panel controls brackets"
@@ -20,6 +23,13 @@ export function Controls({ distMaxLd, onDistMax, scanlines, onScanlines, onReset
     >
       <div className="panel-head"><span>Console</span></div>
       <div className="panel-body">
+        <div className="ctl-group">
+          <div className="ctl-label">View mode</div>
+          <div className="seg">
+            <button aria-pressed={mode === "approx"} onClick={() => onMode("approx")}>GEOCENTRIC</button>
+            <button aria-pressed={mode === "real"} onClick={() => onMode("real")}>HELIO ORBITS</button>
+          </div>
+        </div>
         <div className="ctl-group">
           <div className="ctl-label">Miss-distance filter (LD)</div>
           <div className="seg">
