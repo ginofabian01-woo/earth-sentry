@@ -1,0 +1,37 @@
+:root {
+  /* ---- Gorpcore base palette ---- */
+  --c-charcoal: #1a1c18;
+  --c-charcoal-2: #24271f;
+  --c-olive: #4b5320;
+  --c-olive-lo: #343a17;
+  --c-bone: #e7e3d4;
+  --c-bone-dim: #b3ae9c;
+  --c-orange: #c65d2e;
+
+  /* ---- Phosphor CRT accents ---- */
+  --c-amber: #ffb000;
+  --c-green: #33ff66;
+  --c-danger: #ff5a4d;
+
+  /* ---- Semantic ---- */
+  --bg: var(--c-charcoal);
+  --panel: color-mix(in srgb, var(--c-charcoal-2) 86%, black);
+  --panel-line: color-mix(in srgb, var(--c-olive) 55%, var(--c-bone) 6%);
+  --ink: var(--c-bone);
+  --ink-dim: var(--c-bone-dim);
+  --accent: var(--c-amber);
+  --accent-2: var(--c-green);
+  --hazard: var(--c-danger);
+
+  --glow-amber: 0 0 6px color-mix(in srgb, var(--c-amber) 70%, transparent);
+  --glow-green: 0 0 6px color-mix(in srgb, var(--c-green) 70%, transparent);
+
+  /* ---- Type ---- */
+  --font-mono: "Space Mono", "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  --font-sans: "Inter", system-ui, -apple-system, sans-serif;
+
+  /* ---- Layout ---- */
+  --hud-pad: 14px;
+  --radius: 2px;
+  --line: 1px solid var(--panel-line);
+}
