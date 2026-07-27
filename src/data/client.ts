@@ -8,11 +8,10 @@ const LS_PREFIX = "nee:cache:";
 
 export const NASA_KEY = import.meta.env.VITE_NASA_API_KEY || "DEMO_KEY";
 
-// JPL ssd-api has no CORS headers; in dev we hit it via the Vite proxy (/jpl).
-// In production, set VITE_JPL_BASE to a host/rewrite that adds CORS (or a proxy).
-export const JPL_BASE = import.meta.env.DEV
-  ? "/jpl"
-  : (import.meta.env.VITE_JPL_BASE as string | undefined) || "https://ssd-api.jpl.nasa.gov";
+// JPL ssd-api has no CORS headers, so it must be proxied same-origin under /jpl:
+// the Vite dev server proxies it in development, and nginx proxies it in the
+// Docker/production image. Override with VITE_JPL_BASE only for a custom host.
+export const JPL_BASE = (import.meta.env.VITE_JPL_BASE as string | undefined) || "/jpl";
 
 function lsGet(key: string): { at: number; data: unknown } | null {
   try {

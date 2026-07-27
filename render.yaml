@@ -1,0 +1,10 @@
+# Render Blueprint — deploys the Docker image as a web service.
+# Render injects PORT at runtime; the nginx template listens on it.
+services:
+  - type: web
+    name: earth-sentry
+    runtime: docker
+    dockerfilePath: ./Dockerfile
+    plan: free
+    autoDeployTrigger: commit
+    healthCheckPath: /
