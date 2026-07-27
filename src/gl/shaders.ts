@@ -166,6 +166,30 @@ void main() {
   outColor = vec4(vColor, a);
 }`;
 
+// Satellite point cloud (positions already in world/Earth-radii units).
+export const satVert = /* glsl */ `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPos;
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform float uSize;
+void main() {
+  gl_Position = uProj * uView * vec4(aPos, 1.0);
+  gl_PointSize = uSize;
+}`;
+
+export const satFrag = /* glsl */ `#version 300 es
+precision highp float;
+uniform vec3 uColor;
+out vec4 outColor;
+void main() {
+  vec2 p = gl_PointCoord - vec2(0.5);
+  float d = length(p);
+  float a = smoothstep(0.5, 0.15, d);
+  if (a < 0.02) discard;
+  outColor = vec4(uColor, a);
+}`;
+
 export const lineVert = /* glsl */ `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;

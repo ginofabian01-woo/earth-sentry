@@ -80,6 +80,45 @@ export async function fetchJson<T>(url: string, opts: FetchOpts = {}): Promise<T
   }
 }
 
+/** Fetch plain text with the same layered caching (e.g. CelesTrak TLE sets). */
+export async function fetchText(url: string, opts: FetchOpts = {}): Promise<string> {
+  const ttl = opts.ttl ?? 3 * 60 * 60 * 1000;
+  const key = opts.key ?? url;
+  const now = Date.now();
+
+  const mem = memory.get(key);
+  if (mem && now - mem.at < ttl) return mem.data as string;
+  const ls = lsGet(key);
+  if (ls && now - ls.at < ttl) {
+    memory.set(key, ls);
+    return ls.data as string;
+  }
+
+  const existing = inflight.get(key);
+  if (existing) return existing as Promise<string>;
+
+  const request = (async () => {
+    const res = await fetch(url, { headers: { Accept: "text/plain" } });
+    if (!res.ok) {
+      if (mem) return mem.data as string;
+      if (ls) return ls.data as string;
+      throw new Error(`HTTP ${res.status} ${res.statusText} for ${url}`);
+    }
+    const data = await res.text();
+    const entry = { at: Date.now(), data };
+    memory.set(key, entry);
+    lsSet(key, entry);
+    return data;
+  })();
+
+  inflight.set(key, request);
+  try {
+    return await request;
+  } finally {
+    inflight.delete(key);
+  }
+}
+
 /** True if this exact request is already cached and fresh (for status UI). */
 export function isCached(url: string, ttl = 30 * 60 * 1000): boolean {
   const now = Date.now();

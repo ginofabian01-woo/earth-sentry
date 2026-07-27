@@ -55,7 +55,9 @@ npm run dev        # http://localhost:5173
   true NEO orbit ellipses (SBDB elements), positions propagated vs the timeline
   clock, GEOCENTRIC↔HELIO toggle with camera reframe. See `orbital/planets.ts`,
   `scene/orbits.ts`, and the mode branch in `scene/Scene.ts`.
-- **Phase 3 — space-infrastructure layer:** incoming-object animation, ~15k
-  active satellites, Starlink swarms, GPS constellation, ISS + ground track.
-  Data via **CelesTrak** TLE/GP sets, propagated with **SGP4 (`satellite.js`)** —
-  a separate near-Earth-shell pipeline from the NEO/Kepler layer.
+- **Phase 3 (done):** live satellite layers in the geocentric view — Starlink,
+  GPS, ALL ACTIVE (~15k), ISS (+trail) — toggled in the Console. CelesTrak TLE
+  (`data/celestrak.ts`, CORS-open, no proxy) propagated with SGP4 (`satellite.js`)
+  in `scene/satellites.ts`; ECI km → scene Earth-radii, throttled fast clock.
+- **Later:** incoming-object animation, ISS ground track + day/night shadow
+  (satellite.js `eciToGeodetic`/shadow), satellite picking/labels.

@@ -3,10 +3,16 @@ import { Renderer } from "../gl/renderer";
 import { Bodies } from "./bodies";
 import { Markers } from "./markers";
 import { Orbits, type OrbitSpec } from "./orbits";
+import { Satellites, type LayerStyle } from "./satellites";
 import { SCENE } from "./scale";
 import { PLANETS, EARTH_INDEX } from "../orbital/planets";
 import { elementsToPosition, sampleOrbit } from "../orbital/kepler";
 import type { CloseApproach, OrbitalElements } from "../data/types";
+import type { Sat } from "../data/celestrak";
+
+/** Real-time acceleration for satellite propagation (so orbits are visible). */
+const SAT_SPEED = 90;
+const SAT_UPDATE_INTERVAL = 0.12; // seconds of wall-clock between propagations
 
 export type SceneMode = "approx" | "real";
 
@@ -16,6 +22,9 @@ export class Scene {
   private bodies: Bodies;
   readonly markers: Markers;
   private orbits: Orbits;
+  private satellites: Satellites;
+  private readonly satEpochMs = Date.now();
+  private lastSatUpdate = -1;
 
   private mode: SceneMode = "approx";
   private simDate = new Date();
@@ -33,6 +42,7 @@ export class Scene {
     this.bodies = new Bodies(renderer.gl);
     this.markers = new Markers(renderer.gl);
     this.orbits = new Orbits(renderer.gl);
+    this.satellites = new Satellites(renderer.gl);
 
     // planet orbit rings are static
     this.planetOrbitSpecs = PLANETS.map((p) => ({
@@ -81,6 +91,16 @@ export class Scene {
 
   select(index: number) {
     this.markers.selectedIndex = index;
+  }
+
+  setSatelliteLayer(key: string, sats: Sat[], style: LayerStyle, showTrail = false) {
+    this.satellites.setLayer(key, sats, style, showTrail);
+    this.lastSatUpdate = -1; // force an immediate propagation next frame
+  }
+
+  setSatelliteEnabled(key: string, on: boolean) {
+    this.satellites.setEnabled(key, on);
+    this.lastSatUpdate = -1;
   }
 
   /** Rebuild orbit line buffers (only when the object set / mode changes). */
@@ -135,6 +155,15 @@ export class Scene {
       this.bodies.drawEarth(view, proj, cam.position, elapsed);
       this.bodies.drawMoon(view, proj, cam.position, elapsed);
       this.markers.draw(view, proj, elapsed, false);
+
+      // satellites live in the geocentric near-Earth shell, propagated to a
+      // fast clock and refreshed on a throttled cadence
+      if (this.lastSatUpdate < 0 || elapsed - this.lastSatUpdate > SAT_UPDATE_INTERVAL) {
+        this.lastSatUpdate = elapsed;
+        this.satellites.update(new Date(this.satEpochMs + elapsed * 1000 * SAT_SPEED));
+      }
+      const dpr = r.width / Math.max(1, r.canvas.clientWidth);
+      this.satellites.draw(view, proj, dpr);
     }
   };
 
@@ -143,6 +172,7 @@ export class Scene {
     this.bodies.dispose();
     this.markers.dispose();
     this.orbits.dispose();
+    this.satellites.dispose();
   }
 
   /** Render markers to the pick target and resolve the object under a click. */

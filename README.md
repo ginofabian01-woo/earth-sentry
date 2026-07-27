@@ -97,25 +97,21 @@ See `src/scene/scale.ts`.
   propagate against the timeline clock; a GEOCENTRIC ↔ HELIO toggle switches views
   and reframes the camera. (`orbital/kepler.ts` + `orbital/planets.ts` +
   `scene/orbits.ts`.)
-- **Phase 3 — space-infrastructure layer (planned):** render Earth-orbit traffic
-  alongside the NEO layer.
-  - **Incoming objects** — highlight/animate NEOs on approach toward Earth as the
-    sim clock advances (trajectory tails, closest-approach countdown).
-  - **~15,000 active satellites** — full active catalog as an instanced point
-    cloud, propagated live.
-  - **Starlink swarms** — the Starlink group, rendered as distinct shells/trains.
-  - **GPS constellation** — the GPS operational group in MEO (~4.2 Earth radii).
-  - **International Space Station** — ISS (NORAD 25544) as a labeled, focusable
-    object with a live ground track.
+- **Phase 3 — space-infrastructure layer (done):** live Earth-orbit traffic in
+  the geocentric view, as toggleable layers in the Console:
+  - **Starlink swarms** (cyan), **GPS constellation** (amber, MEO ≈ 4.2 Earth
+    radii), **ALL ACTIVE** (~15k-object catalog), and the **ISS** (green, with a
+    live orbit trail).
 
-  **Data + method:** TLE/GP element sets from **CelesTrak**
-  (`https://celestrak.org/NORAD/elements/gp.php?GROUP=<active|starlink|gps-ops|stations>&FORMAT=json`),
-  propagated with **SGP4** (via `satellite.js`) against the sim clock. This is a
-  separate pipeline from the NEO/Kepler layer: satellites live in the near-Earth
-  shell (LEO ≈ 1.03–1.3, MEO/GPS ≈ 4.2 Earth radii) and are best shown at
-  near-real scale. Rendering ~15k points needs an instanced buffer updated on a
-  worker or throttled cadence. **CORS:** CelesTrak may need the same proxy
-  treatment as JPL (add a `/celestrak` dev proxy if so).
+  **Data + method:** TLE element sets from **CelesTrak**
+  (`gp.php?GROUP=<starlink|gps-ops|active|stations>&FORMAT=tle`), propagated with
+  **SGP4 via `satellite.js`**. Positions are ECI (km) mapped to scene Earth-radii
+  units, so satellites sit in the real near-Earth shell. Layers are propagated on
+  a throttled, time-accelerated clock (`scene/satellites.ts`). CelesTrak allows
+  CORS, so no proxy is needed for it (only JPL needs one).
+
+- **Later:** incoming-object approach animation, ISS ground track + day/night
+  shadow (satellite.js `eciToGeodetic`/shadow helpers), satellite picking/labels.
 
 ## Credits
 

@@ -8,8 +8,10 @@ import { Controls } from "./ui/Controls";
 import { ObjectInspector } from "./ui/ObjectInspector";
 import { fetchCloseApproaches } from "./data/jplCad";
 import { fetchObjectDetail } from "./data/jplSbdb";
+import { fetchGroup, ISS_NORAD, type Sat } from "./data/celestrak";
 import type { CloseApproach, ObjectDetail, OrbitalElements } from "./data/types";
 import type { SceneMode } from "./scene/Scene";
+import { SAT_LAYERS } from "./scene/satellites";
 import { addDays, isoDate } from "./orbital/time";
 import "./ui/hud.css";
 
@@ -22,6 +24,10 @@ export default function App() {
   const [scanlines, setScanlines] = useState(true);
   const [mode, setMode] = useState<SceneMode>("approx");
   const [realElements, setRealElements] = useState<(OrbitalElements | null)[]>([]);
+  const [satEnabled, setSatEnabled] = useState<Record<string, boolean>>(
+    () => Object.fromEntries(SAT_LAYERS.map((l) => [l.key, l.defaultOn])),
+  );
+  const [satData, setSatData] = useState<Record<string, Sat[]>>({});
 
   const [approaches, setApproaches] = useState<CloseApproach[]>([]);
   const [loading, setLoading] = useState(true);
@@ -98,6 +104,24 @@ export default function App() {
     };
   }, [mode, approaches]);
 
+  // fetch CelesTrak element sets for enabled satellite layers (once per layer)
+  useEffect(() => {
+    let cancelled = false;
+    for (const layer of SAT_LAYERS) {
+      if (!satEnabled[layer.key] || satData[layer.key]) continue;
+      fetchGroup(layer.group)
+        .then((sats) => {
+          if (cancelled) return;
+          const filtered = layer.issOnly ? sats.filter((s) => s.noradId === ISS_NORAD) : sats;
+          setSatData((prev) => ({ ...prev, [layer.key]: filtered }));
+        })
+        .catch(() => {});
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [satEnabled, satData]);
+
   const selected = approaches[selectedIndex] ?? null;
   const hazardCount = useMemo(() => approaches.filter((a) => a.hazardous).length, [approaches]);
   const nearFocus = useMemo(
@@ -115,6 +139,8 @@ export default function App() {
         mode={mode}
         simDate={focusDate}
         realElements={realElements}
+        satData={satData}
+        satEnabled={satEnabled}
       />
       <Hud loading={loading} error={error} total={approaches.length} hazardCount={hazardCount} />
       <Legend />
@@ -126,6 +152,8 @@ export default function App() {
         scanlines={scanlines}
         onScanlines={setScanlines}
         onReset={() => glRef.current?.resetView()}
+        satEnabled={satEnabled}
+        onToggleSat={(key) => setSatEnabled((prev) => ({ ...prev, [key]: !prev[key] }))}
       />
       <ObjectInspector approach={selected} detail={detail} loading={detailLoading} onClose={() => setSelectedIndex(-1)} />
       <Timeline

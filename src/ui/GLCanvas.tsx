@@ -2,7 +2,9 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 import { Renderer } from "../gl/renderer";
 import { Scene, type SceneMode } from "../scene/Scene";
 import { SCENE } from "../scene/scale";
+import { SAT_LAYERS } from "../scene/satellites";
 import type { CloseApproach, OrbitalElements } from "../data/types";
+import type { Sat } from "../data/celestrak";
 
 export interface GLCanvasHandle {
   resetView: () => void;
@@ -15,6 +17,8 @@ interface Props {
   mode: SceneMode;
   simDate: Date;
   realElements: (OrbitalElements | null)[];
+  satData: Record<string, Sat[]>;
+  satEnabled: Record<string, boolean>;
 }
 
 /**
@@ -23,7 +27,7 @@ interface Props {
  * refs so React re-renders never touch the hot path.
  */
 export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
-  { approaches, selectedIndex, onSelect, mode, simDate, realElements },
+  { approaches, selectedIndex, onSelect, mode, simDate, realElements, satData, satEnabled },
   ref,
 ) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -97,6 +101,22 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
   useEffect(() => {
     sceneRef.current?.select(selectedIndex);
   }, [selectedIndex]);
+
+  // push loaded satellite element sets into the scene
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    for (const layer of SAT_LAYERS) {
+      const sats = satData[layer.key];
+      if (sats) scene.setSatelliteLayer(layer.key, sats, layer.style, !!layer.trail);
+    }
+  }, [satData]);
+
+  useEffect(() => {
+    const scene = sceneRef.current;
+    if (!scene) return;
+    for (const layer of SAT_LAYERS) scene.setSatelliteEnabled(layer.key, !!satEnabled[layer.key]);
+  }, [satEnabled]);
 
   return <canvas id="scene" ref={canvasRef} />;
 });

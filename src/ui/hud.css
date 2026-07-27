@@ -84,6 +84,10 @@
 .toggle .sw { width: 34px; height: 16px; border: var(--line); border-radius: 10px; position: relative; background: var(--c-charcoal); }
 .toggle .sw i { position: absolute; top: 1px; left: 1px; width: 12px; height: 12px; background: var(--ink-dim); border-radius: 50%; transition: transform 0.18s, background 0.18s; }
 .toggle[data-on="true"] .sw i { transform: translateX(18px); background: var(--accent-2); box-shadow: var(--glow-green); }
+.sat-toggle { margin: 5px 0; cursor: pointer; font-size: 10px; letter-spacing: 0.1em; color: var(--ink-dim); }
+.sat-toggle[data-on="true"] { color: var(--ink); }
+.sat-toggle span:first-child { display: flex; align-items: center; gap: 7px; }
+.sat-swatch { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
 /* ---- legend (left, mid) ---- */
 .legend { left: var(--hud-pad); bottom: 120px; width: 180px; }

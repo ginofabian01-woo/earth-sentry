@@ -1,5 +1,6 @@
 import { motion } from "motion/react";
 import type { SceneMode } from "../scene/Scene";
+import { SAT_LAYERS } from "../scene/satellites";
 
 interface Props {
   mode: SceneMode;
@@ -9,11 +10,15 @@ interface Props {
   scanlines: boolean;
   onScanlines: (v: boolean) => void;
   onReset: () => void;
+  satEnabled: Record<string, boolean>;
+  onToggleSat: (key: string) => void;
 }
 
 const DIST_OPTIONS = [5, 10, 20];
 
-export function Controls({ mode, onMode, distMaxLd, onDistMax, scanlines, onScanlines, onReset }: Props) {
+export function Controls({
+  mode, onMode, distMaxLd, onDistMax, scanlines, onScanlines, onReset, satEnabled, onToggleSat,
+}: Props) {
   return (
     <motion.div
       className="panel controls brackets"
@@ -40,6 +45,26 @@ export function Controls({ mode, onMode, distMaxLd, onDistMax, scanlines, onScan
             ))}
           </div>
         </div>
+        {mode === "approx" && (
+          <div className="ctl-group">
+            <div className="ctl-label">Orbital traffic (geocentric)</div>
+            {SAT_LAYERS.map((l) => (
+              <div
+                key={l.key}
+                className="toggle sat-toggle"
+                data-on={!!satEnabled[l.key]}
+                onClick={() => onToggleSat(l.key)}
+                role="button"
+              >
+                <span>
+                  <i className="sat-swatch" style={{ background: `rgb(${l.style.color.map((c) => Math.round(c * 255)).join(",")})` }} />
+                  {l.label}
+                </span>
+                <span className="sw"><i /></span>
+              </div>
+            ))}
+          </div>
+        )}
         <div className="ctl-group">
           <div className="ctl-label">Display</div>
           <div className="toggle" data-on={scanlines} onClick={() => onScanlines(!scanlines)} role="button">
