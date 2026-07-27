@@ -1,0 +1,10 @@
+# Netlify config (alternative to Vercel). Proxies /jpl -> JPL (no CORS upstream).
+[build]
+  command = "npm run build"
+  publish = "dist"
+
+[[redirects]]
+  from = "/jpl/*"
+  to = "https://ssd-api.jpl.nasa.gov/:splat"
+  status = 200
+  force = true

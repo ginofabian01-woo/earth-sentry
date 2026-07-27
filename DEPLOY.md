@@ -4,7 +4,26 @@ The app is a static SPA plus a thin same-origin proxy for JPL's SSD API (which
 sends no CORS headers). The Docker image bundles both via nginx. CelesTrak and
 NASA allow CORS and are called directly from the browser.
 
-## Docker (any host)
+## Vercel (recommended — free, direct from GitHub)
+
+No Docker needed. Vercel serves the static build and proxies `/jpl` to JPL via a
+rewrite (`vercel.json`), so all features work same-origin.
+
+1. Push this repo to GitHub.
+2. [vercel.com](https://vercel.com) → **Add New… → Project** → import the repo.
+3. Framework auto-detects as **Vite** (build `npm run build`, output `dist`).
+   Leave defaults; no env vars required.
+4. **Deploy.** You get a `https://earth-sentry-*.vercel.app` URL that redeploys
+   on every push to `main`.
+
+Optional env var: `VITE_NASA_API_KEY` (build-time) for a personal NASA key.
+
+## Netlify (alternative)
+
+Same idea via `netlify.toml` (proxies `/jpl`). Import the repo at
+[netlify.com](https://netlify.com); build `npm run build`, publish `dist`.
+
+## Docker (Render / any container host)
 
 ```bash
 docker build -t earth-sentry .
