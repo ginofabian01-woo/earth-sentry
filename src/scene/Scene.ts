@@ -7,6 +7,7 @@ import { Satellites, type LayerStyle } from "./satellites";
 import { SCENE } from "./scale";
 import { PLANETS, EARTH_INDEX } from "../orbital/planets";
 import { elementsToPosition, sampleOrbit } from "../orbital/kepler";
+import { approximatePositionAt, approachIntensity } from "../orbital/approximate";
 import type { CloseApproach, OrbitalElements } from "../data/types";
 import type { Sat } from "../data/celestrak";
 
@@ -61,7 +62,7 @@ export class Scene {
 
   setSimDate(date: Date) {
     this.simDate = date;
-    if (this.mode === "real") this.updatePositions();
+    this.updatePositions();
   }
 
   setApproaches(list: CloseApproach[]) {
@@ -122,7 +123,31 @@ export class Scene {
       });
       this.markers.setData(this.approaches, { positions, baseSize: SCENE.MARKER_BASE_SIZE_HELIO });
     } else {
-      this.markers.setData(this.approaches);
+      // geocentric: objects sweep inward toward Earth as the cursor nears their
+      // close-approach date, with fading trajectory tails streaming outward.
+      const positions: (vec3 | null)[] = this.approaches.map((ca) =>
+        approximatePositionAt(ca, this.simDate, vec3.create()),
+      );
+      this.markers.setData(this.approaches, { positions });
+
+      const tails: OrbitSpec[] = [];
+      for (let i = 0; i < this.approaches.length; i++) {
+        const ca = this.approaches[i];
+        const intensity = approachIntensity(ca, this.simDate);
+        if (intensity <= 0.03) continue;
+        const p = positions[i]!;
+        const len = Math.hypot(p[0], p[1], p[2]) || 1;
+        const tailLen = 2 + 7 * intensity;
+        const ex = p[0] + (p[0] / len) * tailLen;
+        const ey = p[1] + (p[1] / len) * tailLen;
+        const ez = p[2] + (p[2] / len) * tailLen;
+        tails.push({
+          points: new Float32Array([p[0], p[1], p[2], ex, ey, ez]),
+          color: ca.hazardous ? [1.0, 0.4, 0.35] : [1.0, 0.72, 0.2],
+          alpha: 0.2 + 0.6 * intensity,
+        });
+      }
+      this.orbits.setOrbits(tails);
     }
   }
 
@@ -154,6 +179,7 @@ export class Scene {
       this.bodies.drawSun(view, proj, cam.position, elapsed);
       this.bodies.drawEarth(view, proj, cam.position, elapsed);
       this.bodies.drawMoon(view, proj, cam.position, elapsed);
+      this.orbits.draw(view, proj, 1); // approach tails (points already in world units)
       this.markers.draw(view, proj, elapsed, false);
 
       // satellites live in the geocentric near-Earth shell, propagated to a

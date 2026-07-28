@@ -110,8 +110,12 @@ See `src/scene/scale.ts`.
   a throttled, time-accelerated clock (`scene/satellites.ts`). CelesTrak allows
   CORS, so no proxy is needed for it (only JPL needs one).
 
-- **Later:** incoming-object approach animation, ISS ground track + day/night
-  shadow (satellite.js `eciToGeodetic`/shadow helpers), satellite picking/labels.
+- **Phase 3.1 (done):** **incoming-object animation** — geocentric NEOs sweep in
+  toward Earth as the timeline cursor nears each close-approach date, with fading
+  trajectory tails; and the **ISS ground track** (sub-satellite path projected to
+  the surface) alongside its orbit trail.
+- **Later:** day/night shadow (satellite.js shadow helpers), satellite
+  picking/labels, live "now" auto-advance.
 
 ## Credits
 

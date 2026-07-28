@@ -24,7 +24,13 @@ interface Layer {
   trailBuf: WebGLBuffer | null;
   trailVao: WebGLVertexArrayObject | null;
   trailCount: number;
+  groundBuf: WebGLBuffer | null;
+  groundVao: WebGLVertexArrayObject | null;
+  groundCount: number;
 }
+
+/** Surface offset for the ground track so it doesn't z-fight the globe. */
+const GROUND_R = 1.015;
 
 const R = EARTH_RADIUS_KM;
 
@@ -63,6 +69,7 @@ export class Satellites {
         buf: gl.createBuffer()!, vao: gl.createVertexArray()!,
         scratch: new Float32Array(sats.length * 3), count: 0,
         showTrail, trailBuf: null, trailVao: null, trailCount: 0,
+        groundBuf: null, groundVao: null, groundCount: 0,
       };
       gl.bindVertexArray(layer.vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, layer.buf);
@@ -73,6 +80,13 @@ export class Satellites {
         layer.trailVao = gl.createVertexArray()!;
         gl.bindVertexArray(layer.trailVao);
         gl.bindBuffer(gl.ARRAY_BUFFER, layer.trailBuf);
+        gl.enableVertexAttribArray(0);
+        gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+
+        layer.groundBuf = gl.createBuffer()!;
+        layer.groundVao = gl.createVertexArray()!;
+        gl.bindVertexArray(layer.groundVao);
+        gl.bindBuffer(gl.ARRAY_BUFFER, layer.groundBuf);
         gl.enableVertexAttribArray(0);
         gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
       }
@@ -122,20 +136,32 @@ export class Satellites {
     const SEG = 120;
     const spanMin = 92; // ~one ISS orbit
     const pts = new Float32Array((SEG + 1) * 3);
+    const ground = new Float32Array((SEG + 1) * 3);
     let m = 0;
     for (let i = 0; i <= SEG; i++) {
       const t = new Date(date.getTime() + (i / SEG - 0.5) * spanMin * 60000);
       const pv = satellite.propagate(iss.satrec, t);
       const p = pv?.position;
       if (!p || typeof p === "boolean") continue;
-      pts[m * 3] = p.x / R;
-      pts[m * 3 + 1] = p.z / R;
-      pts[m * 3 + 2] = -p.y / R;
+      const x = p.x / R, y = p.z / R, z = -p.y / R;
+      pts[m * 3] = x;
+      pts[m * 3 + 1] = y;
+      pts[m * 3 + 2] = z;
+      // sub-satellite point: project onto the globe surface (same ECI frame)
+      const inv = GROUND_R / (Math.hypot(x, y, z) || 1);
+      ground[m * 3] = x * inv;
+      ground[m * 3 + 1] = y * inv;
+      ground[m * 3 + 2] = z * inv;
       m++;
     }
     layer.trailCount = m;
     gl.bindBuffer(gl.ARRAY_BUFFER, layer.trailBuf);
     gl.bufferData(gl.ARRAY_BUFFER, pts.subarray(0, m * 3), gl.DYNAMIC_DRAW);
+    layer.groundCount = m;
+    if (layer.groundBuf) {
+      gl.bindBuffer(gl.ARRAY_BUFFER, layer.groundBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, ground.subarray(0, m * 3), gl.DYNAMIC_DRAW);
+    }
   }
 
   draw(view: mat4, proj: mat4, dpr: number) {
@@ -150,11 +176,19 @@ export class Satellites {
     gl.uniformMatrix4fv(this.lineU.uProj, false, proj);
     gl.uniformMatrix4fv(this.lineU.uModel, false, this.identity);
     for (const layer of this.layers.values()) {
-      if (!layer.enabled || !layer.showTrail || !layer.trailVao || layer.trailCount < 2) continue;
+      if (!layer.enabled || !layer.showTrail) continue;
       gl.uniform3fv(this.lineU.uColor, layer.style.color);
-      gl.uniform1f(this.lineU.uAlpha, 0.5);
-      gl.bindVertexArray(layer.trailVao);
-      gl.drawArrays(gl.LINE_STRIP, 0, layer.trailCount);
+      if (layer.trailVao && layer.trailCount >= 2) {
+        gl.uniform1f(this.lineU.uAlpha, 0.5);
+        gl.bindVertexArray(layer.trailVao);
+        gl.drawArrays(gl.LINE_STRIP, 0, layer.trailCount);
+      }
+      // ground track on the globe surface (dimmer)
+      if (layer.groundVao && layer.groundCount >= 2) {
+        gl.uniform1f(this.lineU.uAlpha, 0.28);
+        gl.bindVertexArray(layer.groundVao);
+        gl.drawArrays(gl.LINE_STRIP, 0, layer.groundCount);
+      }
     }
 
     gl.useProgram(this.prog);
@@ -179,6 +213,8 @@ export class Satellites {
       gl.deleteVertexArray(layer.vao);
       if (layer.trailBuf) gl.deleteBuffer(layer.trailBuf);
       if (layer.trailVao) gl.deleteVertexArray(layer.trailVao);
+      if (layer.groundBuf) gl.deleteBuffer(layer.groundBuf);
+      if (layer.groundVao) gl.deleteVertexArray(layer.groundVao);
     }
     this.layers.clear();
     gl.deleteProgram(this.prog);
