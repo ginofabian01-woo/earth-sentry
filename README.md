@@ -122,7 +122,9 @@ See `src/scene/scale.ts`.
   "now", sweeps the window forward, driving the incoming-object animation), and
   **identifier labels** for the Sun, Moon, and inner planets (they appear as you
   zoom out / in heliocentric mode).
-- **Later:** day/night terminator shadow (satellite.js shadow helpers).
+- **Phase 3.4 (done):** **day/night** — Earth keeps its sunlit/dark terminator,
+  and **satellites are dimmed in eclipse** as they pass through Earth's shadow
+  (umbra + soft penumbra computed in the point shader).
 
 ## Credits
 

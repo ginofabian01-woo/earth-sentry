@@ -262,7 +262,7 @@ export class Scene {
         this.satellites.update(this.currentSatDate);
       }
       const dpr = r.width / Math.max(1, r.canvas.clientWidth);
-      this.satellites.draw(view, proj, dpr);
+      this.satellites.draw(view, proj, dpr, this.bodies.sunDir);
       this.emitLabels(view, proj, elapsed);
     }
   };

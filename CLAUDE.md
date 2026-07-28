@@ -68,4 +68,7 @@ npm run dev        # http://localhost:5173
   `focus`, shifts window on wrap; manual scrub/shift pauses); celestial-body
   identifier labels (Sun/Moon geocentric, Sun+planets helio) via the same
   `Scene.emitLabels` overlay, `kind:"body"` style.
-- **Later:** day/night terminator shadow (satellite.js shadow helpers).
+- **Phase 3.4 (done):** day/night — Earth terminator (existing planet shader) +
+  satellite eclipse dimming: `satVert` computes umbra/penumbra from `uSunDir`
+  (`bodies.sunDir`) and shades points behind Earth within the shadow cylinder.
+- **Backlog now empty** — all planned features shipped.

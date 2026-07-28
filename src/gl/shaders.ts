@@ -173,13 +173,24 @@ layout(location=0) in vec3 aPos;
 uniform mat4 uView;
 uniform mat4 uProj;
 uniform float uSize;
+uniform vec3 uSunDir;   // direction TO the sun (unit), scene frame
+out float vShade;       // 1 = sunlit, <1 = in Earth's shadow
 void main() {
   gl_Position = uProj * uView * vec4(aPos, 1.0);
   gl_PointSize = uSize;
+  // eclipse: behind Earth from the sun and within the shadow cylinder (R=1)
+  float proj = dot(aPos, uSunDir);
+  float shade = 1.0;
+  if (proj < 0.0) {
+    float perp = length(aPos - proj * uSunDir);
+    shade = mix(0.28, 1.0, smoothstep(0.9, 1.15, perp)); // soft penumbra
+  }
+  vShade = shade;
 }`;
 
 export const satFrag = /* glsl */ `#version 300 es
 precision highp float;
+in float vShade;
 uniform vec3 uColor;
 out vec4 outColor;
 void main() {
@@ -187,7 +198,8 @@ void main() {
   float d = length(p);
   float a = smoothstep(0.5, 0.15, d);
   if (a < 0.02) discard;
-  outColor = vec4(uColor, a);
+  vec3 col = uColor * vShade;
+  outColor = vec4(col, a * (0.5 + 0.5 * vShade));
 }`;
 
 // Satellite color-ID picking: each point carries a global id; encode id+base

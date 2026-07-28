@@ -72,7 +72,7 @@ export class Satellites {
   constructor(gl: GL) {
     this.gl = gl;
     this.prog = createProgram(gl, satVert, satFrag);
-    this.u = uniformLocations(gl, this.prog, ["uView", "uProj", "uSize", "uColor"]);
+    this.u = uniformLocations(gl, this.prog, ["uView", "uProj", "uSize", "uColor", "uSunDir"]);
     this.lineProg = createProgram(gl, lineVert, lineFrag);
     this.lineU = uniformLocations(gl, this.lineProg, ["uView", "uProj", "uModel", "uColor", "uAlpha"]);
     this.pickProg = createProgram(gl, satPickVert, satPickFrag);
@@ -215,7 +215,7 @@ export class Satellites {
     }
   }
 
-  draw(view: mat4, proj: mat4, dpr: number) {
+  draw(view: mat4, proj: mat4, dpr: number, sunDir: vec3) {
     const gl = this.gl;
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
@@ -245,6 +245,7 @@ export class Satellites {
     gl.useProgram(this.prog);
     gl.uniformMatrix4fv(this.u.uView, false, view);
     gl.uniformMatrix4fv(this.u.uProj, false, proj);
+    gl.uniform3fv(this.u.uSunDir, sunDir);
     for (const layer of this.layers.values()) {
       if (!layer.enabled || layer.count === 0) continue;
       gl.uniform3fv(this.u.uColor, layer.style.color);
