@@ -40,6 +40,7 @@ export default function App() {
   const [detailLoading, setDetailLoading] = useState(false);
 
   const [focus, setFocus] = useState(0); // 0..1 cursor across the window
+  const [live, setLive] = useState(false); // auto-advancing "now" clock
 
   const windowEnd = useMemo(() => addDays(windowStart, spanDays), [windowStart, spanDays]);
   const focusDate = useMemo(
@@ -124,6 +125,38 @@ export default function App() {
     };
   }, [satEnabled, satData]);
 
+  // auto-advance the cursor across the window; shift the window forward on wrap
+  const focusRef = useRef(focus);
+  focusRef.current = focus;
+  useEffect(() => {
+    if (!live) return;
+    const LIVE_CROSS_SECONDS = 60; // seconds to sweep the whole window
+    const id = setInterval(() => {
+      let next = focusRef.current + 0.1 / LIVE_CROSS_SECONDS;
+      if (next >= 1) {
+        next -= 1;
+        setWindowStart((w) => addDays(w, spanDays));
+      }
+      focusRef.current = next;
+      setFocus(next);
+    }, 100);
+    return () => clearInterval(id);
+  }, [live, spanDays]);
+
+  // manual timeline interaction pauses live playback
+  const toggleLive = () => {
+    if (!live) {
+      setWindowStart(new Date());
+      setFocus(0);
+      setLive(true);
+    } else {
+      setLive(false);
+    }
+  };
+  const scrub = (v: number) => { setLive(false); setFocus(v); };
+  const changeSpan = (d: number) => { setLive(false); setSpanDays(d); };
+  const shiftWindow = (d: number) => { setLive(false); setWindowStart((w) => addDays(w, d)); };
+
   const selected = approaches[selectedIndex] ?? null;
   const hazardCount = useMemo(() => approaches.filter((a) => a.hazardous).length, [approaches]);
   const nearFocus = useMemo(
@@ -174,11 +207,13 @@ export default function App() {
         focus={focus}
         focusDate={focusDate}
         nearFocus={nearFocus}
-        onFocus={setFocus}
-        onSpan={setSpanDays}
-        onShift={(days) => setWindowStart((d) => addDays(d, days))}
+        live={live}
+        onToggleLive={toggleLive}
+        onFocus={scrub}
+        onSpan={changeSpan}
+        onShift={shiftWindow}
       />
-      <StatusBar total={approaches.length} distMaxLd={distMaxLd} focusDate={focusDate} loading={loading} />
+      <StatusBar total={approaches.length} distMaxLd={distMaxLd} focusDate={focusDate} loading={loading} live={live} />
       <div className="crt-overlay" data-scanlines={scanlines ? "on" : "off"} />
     </>
   );

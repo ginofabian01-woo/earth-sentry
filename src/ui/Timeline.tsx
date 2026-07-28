@@ -10,6 +10,8 @@ interface Props {
   focus: number;
   focusDate: Date;
   nearFocus: number;
+  live: boolean;
+  onToggleLive: () => void;
   onFocus: (v: number) => void;
   onSpan: (days: number) => void;
   onShift: (days: number) => void;
@@ -35,7 +37,7 @@ export function Timeline(p: Props) {
       transition={{ delay: 0.15, type: "spring", stiffness: 240, damping: 28 }}
     >
       <div className="panel-head">
-        <span>Encounter Timeline</span>
+        <span>Encounter Timeline{p.live && <span className="playing"> · ▶ LIVE</span>}</span>
         <span className="dim">{p.nearFocus} NEAR CURSOR · ±36H</span>
       </div>
       <div className="panel-body" style={{ paddingBottom: 8 }}>
@@ -67,6 +69,9 @@ export function Timeline(p: Props) {
         />
         <div className="tl-controls">
           <div className="seg">
+            <button aria-pressed={p.live} onClick={p.onToggleLive} title="Auto-advance from now">
+              {p.live ? "⏸ PAUSE" : "▶ LIVE"}
+            </button>
             <button onClick={() => p.onShift(-p.spanDays)}>◀ PREV</button>
             <button onClick={() => p.onShift(p.spanDays)}>NEXT ▶</button>
           </div>

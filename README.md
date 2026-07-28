@@ -118,8 +118,11 @@ See `src/scene/scale.ts`.
   track dossier (name, NORAD id, altitude, speed, layer); on-screen **tracking
   labels** that follow the selected satellite and always mark the ISS; and **info
   tooltips** on each Orbital Traffic layer.
-- **Later:** day/night terminator shadow (satellite.js shadow helpers), a live
-  "now" auto-advancing clock.
+- **Phase 3.3 (done):** a **LIVE** auto-advancing timeline clock (starts at
+  "now", sweeps the window forward, driving the incoming-object animation), and
+  **identifier labels** for the Sun, Moon, and inner planets (they appear as you
+  zoom out / in heliocentric mode).
+- **Later:** day/night terminator shadow (satellite.js shadow helpers).
 
 ## Credits
 

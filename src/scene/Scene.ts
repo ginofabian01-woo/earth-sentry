@@ -22,6 +22,7 @@ export interface ScreenLabel {
   color: [number, number, number];
   x: number;
   y: number;
+  kind: "sat" | "body";
 }
 
 export type PickResult =
@@ -56,6 +57,7 @@ export class Scene {
   private readonly viewProj = mat4.create();
   private readonly clip = vec4.create();
   private readonly labelPos = vec3.create();
+  private readonly moonPos = vec3.create();
 
   constructor(renderer: Renderer) {
     this.renderer = renderer;
@@ -145,18 +147,31 @@ export class Scene {
     return { x: (nx * 0.5 + 0.5) * cw, y: (1 - (ny * 0.5 + 0.5)) * ch };
   }
 
-  private emitLabels(view: mat4, proj: mat4) {
+  private emitLabels(view: mat4, proj: mat4, elapsed: number) {
     if (!this.onLabels) return;
     const labels: ScreenLabel[] = [];
-    const add = (hit: SatHit) => {
-      const pos = this.satellites.positionOf(hit.sat, this.currentSatDate, this.labelPos);
-      if (!pos) return;
-      const s = this.project(pos, view, proj);
-      if (s) labels.push({ name: hit.sat.name, color: hit.color, x: s.x, y: s.y });
+    const push = (name: string, color: [number, number, number], world: vec3, kind: "sat" | "body") => {
+      const s = this.project(world, view, proj);
+      if (s) labels.push({ name, color, x: s.x, y: s.y, kind });
     };
-    const iss = this.satellites.getISS();
-    if (iss && this.satellites.isEnabled(iss.layerKey)) add(iss);
-    if (this.selectedHit && this.selectedHit.sat.noradId !== iss?.sat.noradId) add(this.selectedHit);
+
+    if (this.mode === "real") {
+      push("SUN", [1.0, 0.72, 0.2], this.origin, "body");
+      for (let i = 0; i < PLANETS.length; i++) {
+        push(PLANETS[i].name.toUpperCase(), PLANETS[i].ringColor, this.planetPositions[i], "body");
+      }
+    } else {
+      push("MOON", [0.72, 0.74, 0.78], this.bodies.moonPosition(elapsed, this.moonPos), "body");
+      push("SUN", [1.0, 0.72, 0.2], this.bodies.sunWorldPosition, "body");
+
+      const addSat = (hit: SatHit) => {
+        const pos = this.satellites.positionOf(hit.sat, this.currentSatDate, this.labelPos);
+        if (pos) push(hit.sat.name, hit.color, pos, "sat");
+      };
+      const iss = this.satellites.getISS();
+      if (iss && this.satellites.isEnabled(iss.layerKey)) addSat(iss);
+      if (this.selectedHit && this.selectedHit.sat.noradId !== iss?.sat.noradId) addSat(this.selectedHit);
+    }
     this.onLabels(labels);
   }
 
@@ -231,7 +246,7 @@ export class Scene {
       }
       this.orbits.draw(view, proj, SCENE.AU_UNIT);
       this.markers.draw(view, proj, elapsed, false);
-      this.onLabels?.([]); // no satellite labels in heliocentric mode
+      this.emitLabels(view, proj, elapsed); // sun + planet labels
     } else {
       this.bodies.drawSun(view, proj, cam.position, elapsed);
       this.bodies.drawEarth(view, proj, cam.position, elapsed);
@@ -248,7 +263,7 @@ export class Scene {
       }
       const dpr = r.width / Math.max(1, r.canvas.clientWidth);
       this.satellites.draw(view, proj, dpr);
-      this.emitLabels(view, proj);
+      this.emitLabels(view, proj, elapsed);
     }
   };
 

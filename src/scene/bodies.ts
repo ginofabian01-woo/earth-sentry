@@ -170,4 +170,14 @@ export class Bodies {
     );
     return center;
   }
+
+  /** Moon world position at a given time (matches drawMoon's orbit). */
+  moonPosition(time: number, out = vec3.create()): vec3 {
+    const a = time * 0.12;
+    return vec3.set(out, Math.cos(a) * SCENE.MOON_DISTANCE, Math.sin(a) * 3.5, Math.sin(a) * SCENE.MOON_DISTANCE);
+  }
+
+  get sunWorldPosition(): vec3 {
+    return this.sunPos;
+  }
 }

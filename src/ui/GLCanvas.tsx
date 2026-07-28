@@ -82,9 +82,9 @@ export const GLCanvas = forwardRef<GLCanvasHandle, Props>(function GLCanvas(
       while (host.childElementCount > labels.length) host.removeChild(host.lastChild!);
       labels.forEach((l, i) => {
         const el = host.children[i] as HTMLElement;
+        el.className = `sat-label ${l.kind}`;
         el.style.transform = `translate(${l.x.toFixed(1)}px, ${l.y.toFixed(1)}px)`;
-        (el.firstElementChild as HTMLElement).style.background =
-          `rgb(${l.color.map((c) => Math.round(c * 255)).join(",")})`;
+        el.style.setProperty("--c", `rgb(${l.color.map((c) => Math.round(c * 255)).join(",")})`);
         (el.lastElementChild as HTMLElement).textContent = l.name;
       });
     });

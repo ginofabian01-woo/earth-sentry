@@ -64,5 +64,8 @@ npm run dev        # http://localhost:5173
   with NEO markers) → track dossier; on-screen tracking labels (world→screen
   projection each frame via `Scene.emitLabels`) for the selected sat + ISS; info
   tooltips on each Orbital Traffic layer.
-- **Later:** day/night terminator shadow (satellite.js shadow helpers), live
-  "now" auto-advancing clock.
+- **Phase 3.3 (done):** LIVE auto-advancing timeline clock (App interval advances
+  `focus`, shifts window on wrap; manual scrub/shift pauses); celestial-body
+  identifier labels (Sun/Moon geocentric, Sun+planets helio) via the same
+  `Scene.emitLabels` overlay, `kind:"body"` style.
+- **Later:** day/night terminator shadow (satellite.js shadow helpers).

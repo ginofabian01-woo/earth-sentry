@@ -6,9 +6,10 @@ interface Props {
   distMaxLd: number;
   focusDate: Date;
   loading: boolean;
+  live: boolean;
 }
 
-export function StatusBar({ total, distMaxLd, focusDate, loading }: Props) {
+export function StatusBar({ total, distMaxLd, focusDate, loading, live }: Props) {
   return (
     <div className="panel statusbar">
       <span>
@@ -19,7 +20,10 @@ export function StatusBar({ total, distMaxLd, focusDate, loading }: Props) {
       <span className="sep">|</span>
       <span><span className="k">FILTER</span> <span className="v">≤{distMaxLd} LD</span></span>
       <span className="sep">|</span>
-      <span><span className="k">CURSOR</span> <span className="v">{formatUTC(focusDate)}</span></span>
+      <span>
+        <span className="k">CURSOR</span> <span className="v">{formatUTC(focusDate)}</span>
+        {live && <span className="live"> ▶</span>}
+      </span>
       <span className="right">
         <span className="k">KEY</span> <span className="v">{NASA_KEY === "DEMO_KEY" ? "DEMO_KEY" : "PRIVATE"}</span>
       </span>
