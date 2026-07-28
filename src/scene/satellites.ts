@@ -1,7 +1,7 @@
-import { mat4 } from "gl-matrix";
+import { mat4, vec3 } from "gl-matrix";
 import * as satellite from "satellite.js";
 import { createProgram, uniformLocations } from "../gl/program";
-import { satVert, satFrag, lineVert, lineFrag } from "../gl/shaders";
+import { satVert, satFrag, satPickVert, satPickFrag, lineVert, lineFrag } from "../gl/shaders";
 import { EARTH_RADIUS_KM } from "../data/types";
 import { ISS_NORAD, type Sat } from "../data/celestrak";
 
@@ -10,6 +10,17 @@ type GL = WebGL2RenderingContext;
 export interface LayerStyle {
   color: [number, number, number];
   size: number;
+}
+
+export interface SatHit {
+  sat: Sat;
+  layerKey: string;
+  color: [number, number, number];
+}
+
+export interface SatInfo {
+  altitudeKm: number;
+  speedKmS: number;
 }
 
 interface Layer {
@@ -27,10 +38,16 @@ interface Layer {
   groundBuf: WebGLBuffer | null;
   groundVao: WebGLVertexArrayObject | null;
   groundCount: number;
+  pickBuf: WebGLBuffer;
+  pickScratch: Float32Array;
+  globalIds: Float32Array;
 }
 
 /** Surface offset for the ground track so it doesn't z-fight the globe. */
 const GROUND_R = 1.015;
+
+/** Pick-id offset so satellites don't collide with NEO marker ids (1..N). */
+export const SAT_PICK_BASE = 100000;
 
 const R = EARTH_RADIUS_KM;
 
@@ -45,8 +62,12 @@ export class Satellites {
   private u: Record<string, WebGLUniformLocation | null>;
   private lineProg: WebGLProgram;
   private lineU: Record<string, WebGLUniformLocation | null>;
+  private pickProg: WebGLProgram;
+  private pickU: Record<string, WebGLUniformLocation | null>;
   private readonly identity = mat4.create();
   private layers = new Map<string, Layer>();
+  /** Flat registry: pickList[globalId-1] -> hit. Rebuilt on layer change. */
+  private pickList: SatHit[] = [];
 
   constructor(gl: GL) {
     this.gl = gl;
@@ -54,6 +75,12 @@ export class Satellites {
     this.u = uniformLocations(gl, this.prog, ["uView", "uProj", "uSize", "uColor"]);
     this.lineProg = createProgram(gl, lineVert, lineFrag);
     this.lineU = uniformLocations(gl, this.lineProg, ["uView", "uProj", "uModel", "uColor", "uAlpha"]);
+    this.pickProg = createProgram(gl, satPickVert, satPickFrag);
+    this.pickU = uniformLocations(gl, this.pickProg, ["uView", "uProj", "uSize", "uBase"]);
+  }
+
+  isEnabled(key: string) {
+    return this.layers.get(key)?.enabled ?? false;
   }
 
   hasLayer(key: string) {
@@ -70,11 +97,17 @@ export class Satellites {
         scratch: new Float32Array(sats.length * 3), count: 0,
         showTrail, trailBuf: null, trailVao: null, trailCount: 0,
         groundBuf: null, groundVao: null, groundCount: 0,
+        pickBuf: gl.createBuffer()!, pickScratch: new Float32Array(sats.length),
+        globalIds: new Float32Array(sats.length),
       };
       gl.bindVertexArray(layer.vao);
       gl.bindBuffer(gl.ARRAY_BUFFER, layer.buf);
       gl.enableVertexAttribArray(0);
       gl.vertexAttribPointer(0, 3, gl.FLOAT, false, 0, 0);
+      // per-point pick id at location 1 (ignored by the normal point shader)
+      gl.bindBuffer(gl.ARRAY_BUFFER, layer.pickBuf);
+      gl.enableVertexAttribArray(1);
+      gl.vertexAttribPointer(1, 1, gl.FLOAT, false, 0, 0);
       if (showTrail) {
         layer.trailBuf = gl.createBuffer()!;
         layer.trailVao = gl.createVertexArray()!;
@@ -96,6 +129,20 @@ export class Satellites {
       layer.sats = sats;
       layer.style = style;
       layer.scratch = new Float32Array(sats.length * 3);
+      layer.pickScratch = new Float32Array(sats.length);
+      layer.globalIds = new Float32Array(sats.length);
+    }
+    this.rebuildPickList();
+  }
+
+  /** Assign every satellite a stable 1-based global pick id across all layers. */
+  private rebuildPickList() {
+    this.pickList = [];
+    for (const [key, layer] of this.layers) {
+      for (let i = 0; i < layer.sats.length; i++) {
+        this.pickList.push({ sat: layer.sats[i], layerKey: key, color: layer.style.color });
+        layer.globalIds[i] = this.pickList.length; // 1-based
+      }
     }
   }
 
@@ -111,18 +158,22 @@ export class Satellites {
       if (!layer.enabled || layer.sats.length === 0) continue;
       let n = 0;
       const out = layer.scratch;
-      for (const s of layer.sats) {
-        const pv = satellite.propagate(s.satrec, date);
+      const ids = layer.pickScratch;
+      for (let i = 0; i < layer.sats.length; i++) {
+        const pv = satellite.propagate(layer.sats[i].satrec, date);
         const p = pv?.position;
         if (!p || typeof p === "boolean") continue;
         out[n * 3] = p.x / R;
         out[n * 3 + 1] = p.z / R; // ECI z (north) -> scene up
         out[n * 3 + 2] = -p.y / R;
+        ids[n] = layer.globalIds[i];
         n++;
       }
       layer.count = n;
       gl.bindBuffer(gl.ARRAY_BUFFER, layer.buf);
       gl.bufferData(gl.ARRAY_BUFFER, out.subarray(0, n * 3), gl.DYNAMIC_DRAW);
+      gl.bindBuffer(gl.ARRAY_BUFFER, layer.pickBuf);
+      gl.bufferData(gl.ARRAY_BUFFER, ids.subarray(0, n), gl.DYNAMIC_DRAW);
 
       if (layer.showTrail && layer.trailBuf) this.updateTrail(layer, date);
     }
@@ -206,10 +257,59 @@ export class Satellites {
     gl.disable(gl.BLEND);
   }
 
+  /** Render enabled layers into the pick target with fat, id-colored points. */
+  drawPick(view: mat4, proj: mat4, dpr: number) {
+    const gl = this.gl;
+    gl.useProgram(this.pickProg);
+    gl.uniformMatrix4fv(this.pickU.uView, false, view);
+    gl.uniformMatrix4fv(this.pickU.uProj, false, proj);
+    gl.uniform1f(this.pickU.uBase, SAT_PICK_BASE);
+    gl.disable(gl.BLEND);
+    gl.depthMask(true);
+    for (const layer of this.layers.values()) {
+      if (!layer.enabled || layer.count === 0) continue;
+      gl.uniform1f(this.pickU.uSize, Math.max(9, layer.style.size * dpr * 2.2));
+      gl.bindVertexArray(layer.vao);
+      gl.drawArrays(gl.POINTS, 0, layer.count);
+    }
+    gl.bindVertexArray(null);
+  }
+
+  /** Resolve a decoded pick id (already offset-subtracted) to a satellite. */
+  resolvePick(globalId: number): SatHit | null {
+    return this.pickList[globalId - 1] ?? null;
+  }
+
+  /** The ISS hit (if its layer is loaded), regardless of enabled state. */
+  getISS(): SatHit | null {
+    return this.pickList.find((h) => h.sat.noradId === ISS_NORAD) ?? null;
+  }
+
+  /** Scene-space position of a satellite at a date, or null if propagation fails. */
+  positionOf(sat: Sat, date: Date, out = vec3.create()): vec3 | null {
+    const pv = satellite.propagate(sat.satrec, date);
+    const p = pv?.position;
+    if (!p || typeof p === "boolean") return null;
+    return vec3.set(out, p.x / R, p.z / R, -p.y / R);
+  }
+
+  /** Altitude (km above surface) and speed (km/s) at a date. */
+  infoOf(sat: Sat, date: Date): SatInfo | null {
+    const pv = satellite.propagate(sat.satrec, date);
+    const p = pv?.position;
+    const v = pv?.velocity;
+    if (!p || typeof p === "boolean" || !v || typeof v === "boolean") return null;
+    return {
+      altitudeKm: Math.hypot(p.x, p.y, p.z) - R,
+      speedKmS: Math.hypot(v.x, v.y, v.z),
+    };
+  }
+
   dispose() {
     const gl = this.gl;
     for (const layer of this.layers.values()) {
       gl.deleteBuffer(layer.buf);
+      gl.deleteBuffer(layer.pickBuf);
       gl.deleteVertexArray(layer.vao);
       if (layer.trailBuf) gl.deleteBuffer(layer.trailBuf);
       if (layer.trailVao) gl.deleteVertexArray(layer.trailVao);
@@ -217,8 +317,10 @@ export class Satellites {
       if (layer.groundVao) gl.deleteVertexArray(layer.groundVao);
     }
     this.layers.clear();
+    this.pickList = [];
     gl.deleteProgram(this.prog);
     gl.deleteProgram(this.lineProg);
+    gl.deleteProgram(this.pickProg);
   }
 }
 
@@ -231,9 +333,14 @@ export const SAT_LAYERS: {
   trail?: boolean;
   issOnly?: boolean;
   defaultOn: boolean;
+  hint: string;
 }[] = [
-  { key: "starlink", group: "starlink", label: "STARLINK", style: { color: [0.35, 0.8, 1.0], size: 2.2 }, defaultOn: true },
-  { key: "gps", group: "gps-ops", label: "GPS", style: { color: [1.0, 0.72, 0.2], size: 3.2 }, defaultOn: true },
-  { key: "active", group: "active", label: "ALL ACTIVE", style: { color: [0.72, 0.76, 0.82], size: 1.5 }, defaultOn: false },
-  { key: "iss", group: "stations", label: "ISS", style: { color: [0.4, 1.0, 0.5], size: 6.0 }, trail: true, issOnly: true, defaultOn: true },
+  { key: "starlink", group: "starlink", label: "STARLINK", style: { color: [0.35, 0.8, 1.0], size: 2.2 }, defaultOn: true,
+    hint: "SpaceX Starlink broadband constellation — thousands of satellites in low Earth orbit (~550 km)." },
+  { key: "gps", group: "gps-ops", label: "GPS", style: { color: [1.0, 0.72, 0.2], size: 3.2 }, defaultOn: true,
+    hint: "Operational GPS navigation satellites in medium Earth orbit (~20,200 km)." },
+  { key: "active", group: "active", label: "ALL ACTIVE", style: { color: [0.72, 0.76, 0.82], size: 1.5 }, defaultOn: false,
+    hint: "The full CelesTrak catalog of ~15,000 active satellites. Heavy layer — expect a brief load." },
+  { key: "iss", group: "stations", label: "ISS", style: { color: [0.4, 1.0, 0.5], size: 6.0 }, trail: true, issOnly: true, defaultOn: true,
+    hint: "International Space Station (NORAD 25544) with its orbit trail and ground track." },
 ];

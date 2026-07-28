@@ -59,6 +59,14 @@ export function Controls({
                 <span>
                   <i className="sat-swatch" style={{ background: `rgb(${l.style.color.map((c) => Math.round(c * 255)).join(",")})` }} />
                   {l.label}
+                  <span
+                    className="info"
+                    tabIndex={0}
+                    role="img"
+                    aria-label={`${l.label}: ${l.hint}`}
+                    data-hint={l.hint}
+                    onClick={(e) => e.stopPropagation()}
+                  >i</span>
                 </span>
                 <span className="sw"><i /></span>
               </div>

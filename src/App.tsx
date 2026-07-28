@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { GLCanvas, type GLCanvasHandle } from "./ui/GLCanvas";
+import { GLCanvas, type GLCanvasHandle, type SatSelection } from "./ui/GLCanvas";
+import { SatelliteInspector } from "./ui/SatelliteInspector";
 import { Hud } from "./ui/Hud";
 import { Timeline } from "./ui/Timeline";
 import { Legend } from "./ui/Legend";
@@ -28,6 +29,7 @@ export default function App() {
     () => Object.fromEntries(SAT_LAYERS.map((l) => [l.key, l.defaultOn])),
   );
   const [satData, setSatData] = useState<Record<string, Sat[]>>({});
+  const [selectedSat, setSelectedSat] = useState<SatSelection | null>(null);
 
   const [approaches, setApproaches] = useState<CloseApproach[]>([]);
   const [loading, setLoading] = useState(true);
@@ -136,6 +138,7 @@ export default function App() {
         approaches={approaches}
         selectedIndex={selectedIndex}
         onSelect={setSelectedIndex}
+        onSelectSat={setSelectedSat}
         mode={mode}
         simDate={focusDate}
         realElements={realElements}
@@ -156,6 +159,13 @@ export default function App() {
         onToggleSat={(key) => setSatEnabled((prev) => ({ ...prev, [key]: !prev[key] }))}
       />
       <ObjectInspector approach={selected} detail={detail} loading={detailLoading} onClose={() => setSelectedIndex(-1)} />
+      <SatelliteInspector
+        sat={selectedSat}
+        onClose={() => {
+          setSelectedSat(null);
+          glRef.current?.clearSatSelection();
+        }}
+      />
       <Timeline
         windowStart={windowStart}
         windowEnd={windowEnd}

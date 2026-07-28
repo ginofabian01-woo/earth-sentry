@@ -59,5 +59,10 @@ npm run dev        # http://localhost:5173
   GPS, ALL ACTIVE (~15k), ISS (+trail) — toggled in the Console. CelesTrak TLE
   (`data/celestrak.ts`, CORS-open, no proxy) propagated with SGP4 (`satellite.js`)
   in `scene/satellites.ts`; ECI km → scene Earth-radii, throttled fast clock.
-- **Later:** incoming-object animation, ISS ground track + day/night shadow
-  (satellite.js `eciToGeodetic`/shadow), satellite picking/labels.
+- **Phase 3.1–3.2 (done):** incoming-object animation + ISS ground track;
+  satellite picking (color-ID pass, `SAT_PICK_BASE` offset so ids don't collide
+  with NEO markers) → track dossier; on-screen tracking labels (world→screen
+  projection each frame via `Scene.emitLabels`) for the selected sat + ISS; info
+  tooltips on each Orbital Traffic layer.
+- **Later:** day/night terminator shadow (satellite.js shadow helpers), live
+  "now" auto-advancing clock.

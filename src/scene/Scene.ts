@@ -1,9 +1,9 @@
-import { vec3 } from "gl-matrix";
+import { mat4, vec3, vec4 } from "gl-matrix";
 import { Renderer } from "../gl/renderer";
 import { Bodies } from "./bodies";
 import { Markers } from "./markers";
 import { Orbits, type OrbitSpec } from "./orbits";
-import { Satellites, type LayerStyle } from "./satellites";
+import { Satellites, SAT_PICK_BASE, type LayerStyle, type SatHit } from "./satellites";
 import { SCENE } from "./scale";
 import { PLANETS, EARTH_INDEX } from "../orbital/planets";
 import { elementsToPosition, sampleOrbit } from "../orbital/kepler";
@@ -16,6 +16,18 @@ const SAT_SPEED = 90;
 const SAT_UPDATE_INTERVAL = 0.12; // seconds of wall-clock between propagations
 
 export type SceneMode = "approx" | "real";
+
+export interface ScreenLabel {
+  name: string;
+  color: [number, number, number];
+  x: number;
+  y: number;
+}
+
+export type PickResult =
+  | { type: "neo"; index: number }
+  | { type: "sat"; name: string; noradId: number; layerKey: string; altitudeKm: number; speedKmS: number }
+  | { type: "none" };
 
 /** Owns all drawables and the per-frame draw order + picking. */
 export class Scene {
@@ -37,6 +49,13 @@ export class Scene {
   private planetPositions: vec3[] = PLANETS.map(() => vec3.create());
   private readonly tmp = vec3.create();
   private readonly origin = vec3.create();
+
+  private currentSatDate = new Date();
+  private selectedHit: SatHit | null = null;
+  private onLabels: ((labels: ScreenLabel[]) => void) | null = null;
+  private readonly viewProj = mat4.create();
+  private readonly clip = vec4.create();
+  private readonly labelPos = vec3.create();
 
   constructor(renderer: Renderer) {
     this.renderer = renderer;
@@ -102,6 +121,43 @@ export class Scene {
   setSatelliteEnabled(key: string, on: boolean) {
     this.satellites.setEnabled(key, on);
     this.lastSatUpdate = -1;
+  }
+
+  /** Register a callback that receives on-screen satellite labels each frame. */
+  setOnLabels(cb: ((labels: ScreenLabel[]) => void) | null) {
+    this.onLabels = cb;
+  }
+
+  clearSelectedSat() {
+    this.selectedHit = null;
+  }
+
+  /** Project a world position to CSS pixels, or null if off-screen/behind. */
+  private project(pos: vec3, view: mat4, proj: mat4): { x: number; y: number } | null {
+    mat4.multiply(this.viewProj, proj, view);
+    vec4.set(this.clip, pos[0], pos[1], pos[2], 1);
+    vec4.transformMat4(this.clip, this.clip, this.viewProj);
+    const w = this.clip[3];
+    if (w <= 0) return null;
+    const nx = this.clip[0] / w, ny = this.clip[1] / w;
+    if (nx < -1.15 || nx > 1.15 || ny < -1.15 || ny > 1.15) return null;
+    const cw = this.renderer.canvas.clientWidth, ch = this.renderer.canvas.clientHeight;
+    return { x: (nx * 0.5 + 0.5) * cw, y: (1 - (ny * 0.5 + 0.5)) * ch };
+  }
+
+  private emitLabels(view: mat4, proj: mat4) {
+    if (!this.onLabels) return;
+    const labels: ScreenLabel[] = [];
+    const add = (hit: SatHit) => {
+      const pos = this.satellites.positionOf(hit.sat, this.currentSatDate, this.labelPos);
+      if (!pos) return;
+      const s = this.project(pos, view, proj);
+      if (s) labels.push({ name: hit.sat.name, color: hit.color, x: s.x, y: s.y });
+    };
+    const iss = this.satellites.getISS();
+    if (iss && this.satellites.isEnabled(iss.layerKey)) add(iss);
+    if (this.selectedHit && this.selectedHit.sat.noradId !== iss?.sat.noradId) add(this.selectedHit);
+    this.onLabels(labels);
   }
 
   /** Rebuild orbit line buffers (only when the object set / mode changes). */
@@ -175,6 +231,7 @@ export class Scene {
       }
       this.orbits.draw(view, proj, SCENE.AU_UNIT);
       this.markers.draw(view, proj, elapsed, false);
+      this.onLabels?.([]); // no satellite labels in heliocentric mode
     } else {
       this.bodies.drawSun(view, proj, cam.position, elapsed);
       this.bodies.drawEarth(view, proj, cam.position, elapsed);
@@ -184,12 +241,14 @@ export class Scene {
 
       // satellites live in the geocentric near-Earth shell, propagated to a
       // fast clock and refreshed on a throttled cadence
+      this.currentSatDate = new Date(this.satEpochMs + elapsed * 1000 * SAT_SPEED);
       if (this.lastSatUpdate < 0 || elapsed - this.lastSatUpdate > SAT_UPDATE_INTERVAL) {
         this.lastSatUpdate = elapsed;
-        this.satellites.update(new Date(this.satEpochMs + elapsed * 1000 * SAT_SPEED));
+        this.satellites.update(this.currentSatDate);
       }
       const dpr = r.width / Math.max(1, r.canvas.clientWidth);
       this.satellites.draw(view, proj, dpr);
+      this.emitLabels(view, proj);
     }
   };
 
@@ -201,15 +260,43 @@ export class Scene {
     this.satellites.dispose();
   }
 
-  /** Render markers to the pick target and resolve the object under a click. */
-  pickAt(cssX: number, cssY: number): number {
+  /**
+   * Resolve the object under a click. NEO markers use pick ids 1..N; satellites
+   * use SAT_PICK_BASE+ so both share one pick pass without colliding.
+   */
+  pickAt(cssX: number, cssY: number): PickResult {
     const r = this.renderer;
     const view = r.camera.viewMatrix();
     const proj = r.camera.projMatrix(r.aspect);
+    const dpr = r.width / Math.max(1, r.canvas.clientWidth);
+
     r.bindPickTarget();
     this.markers.draw(view, proj, 0, true);
+    if (this.mode === "approx") this.satellites.drawPick(view, proj, dpr);
     const px = r.readPick(cssX, cssY);
     r.bindScreen();
-    return this.markers.pickToIndex(px);
+
+    const id = px[0] + px[1] * 256 + px[2] * 65536;
+    if (id === 0) {
+      this.selectedHit = null;
+      return { type: "none" };
+    }
+    if (id >= SAT_PICK_BASE) {
+      const hit = this.satellites.resolvePick(id - SAT_PICK_BASE);
+      if (!hit) return { type: "none" };
+      this.selectedHit = hit;
+      const info = this.satellites.infoOf(hit.sat, this.currentSatDate);
+      return {
+        type: "sat",
+        name: hit.sat.name,
+        noradId: hit.sat.noradId,
+        layerKey: hit.layerKey,
+        altitudeKm: info?.altitudeKm ?? 0,
+        speedKmS: info?.speedKmS ?? 0,
+      };
+    }
+    this.selectedHit = null;
+    const index = this.markers.pickToIndex(px);
+    return index >= 0 ? { type: "neo", index } : { type: "none" };
   }
 }

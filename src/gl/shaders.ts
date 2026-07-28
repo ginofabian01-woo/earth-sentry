@@ -190,6 +190,34 @@ void main() {
   outColor = vec4(uColor, a);
 }`;
 
+// Satellite color-ID picking: each point carries a global id; encode id+base
+// into RGB so the pixel under the cursor resolves to a specific satellite.
+export const satPickVert = /* glsl */ `#version 300 es
+precision highp float;
+layout(location=0) in vec3 aPos;
+layout(location=1) in float aId;
+uniform mat4 uView;
+uniform mat4 uProj;
+uniform float uSize;
+uniform float uBase;
+out vec3 vId;
+void main() {
+  gl_Position = uProj * uView * vec4(aPos, 1.0);
+  gl_PointSize = uSize;
+  float id = aId + uBase;
+  vId = vec3(mod(id, 256.0), mod(floor(id / 256.0), 256.0), mod(floor(id / 65536.0), 256.0)) / 255.0;
+}`;
+
+export const satPickFrag = /* glsl */ `#version 300 es
+precision highp float;
+in vec3 vId;
+out vec4 outColor;
+void main() {
+  vec2 p = gl_PointCoord - vec2(0.5);
+  if (length(p) > 0.5) discard;
+  outColor = vec4(vId, 1.0);
+}`;
+
 export const lineVert = /* glsl */ `#version 300 es
 precision highp float;
 layout(location=0) in vec3 aPos;

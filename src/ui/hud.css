@@ -89,6 +89,40 @@
 .sat-toggle span:first-child { display: flex; align-items: center; gap: 7px; }
 .sat-swatch { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
 
+/* info icon + tooltip on satellite layers */
+.sat-toggle .info {
+  margin-left: 6px; width: 14px; height: 14px; flex: none;
+  border: 1px solid var(--panel-line); border-radius: 50%;
+  font-family: var(--font-mono); font-style: normal; font-size: 9px; font-weight: 700;
+  line-height: 12px; text-align: center; color: var(--ink-dim);
+  cursor: help; position: relative; pointer-events: auto; text-transform: lowercase;
+}
+.sat-toggle .info:hover, .sat-toggle .info:focus-visible { color: var(--accent); border-color: var(--accent); outline: none; }
+.sat-toggle .info[data-hint]:hover::after,
+.sat-toggle .info[data-hint]:focus-visible::after {
+  content: attr(data-hint);
+  position: absolute; right: 20px; top: 50%; transform: translateY(-50%);
+  width: 210px; white-space: normal; text-transform: none; letter-spacing: 0.02em;
+  background: var(--panel); border: var(--line); color: var(--ink);
+  font-size: 10px; font-weight: 400; line-height: 1.45; text-align: left;
+  padding: 9px 11px; border-radius: var(--radius); z-index: 60;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.55);
+}
+
+/* on-screen satellite tracking labels (overlay above canvas, below HUD) */
+.sat-labels { position: fixed; inset: 0; z-index: 15; pointer-events: none; }
+.sat-label {
+  position: absolute; top: 0; left: 0; margin: -5px 0 0 -5px;
+  display: flex; align-items: center; gap: 6px; white-space: nowrap;
+}
+.sat-label .dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 5px rgba(0, 0, 0, 0.7); }
+.sat-label .txt {
+  font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; color: var(--ink);
+  background: color-mix(in srgb, var(--panel) 72%, transparent);
+  border: 1px solid var(--panel-line); border-radius: var(--radius); padding: 1px 6px;
+  text-shadow: 0 1px 2px #000;
+}
+
 /* ---- legend (left, mid) ---- */
 .legend { left: var(--hud-pad); bottom: 120px; width: 180px; }
 .legend .row { display: flex; align-items: center; gap: 8px; font-size: 10px; color: var(--ink-dim); margin: 6px 0; }
@@ -97,7 +131,7 @@
 .legend .dot.haz { background: var(--hazard); box-shadow: 0 0 6px color-mix(in srgb, var(--hazard) 70%, transparent); }
 
 /* ---- object inspector (right) ---- */
-.inspector { top: 262px; right: var(--hud-pad); width: 258px; max-height: calc(100vh - 400px); overflow: auto; }
+.inspector { top: 360px; right: var(--hud-pad); width: 258px; max-height: calc(100vh - 540px); overflow: auto; }
 .inspector .name { font-size: 13px; color: var(--ink); letter-spacing: 0.04em; }
 .inspector .des { font-size: 10px; color: var(--accent); letter-spacing: 0.14em; margin-top: 2px; }
 .kv { display: flex; justify-content: space-between; gap: 8px; font-size: 11px; padding: 5px 0; border-bottom: 1px dashed color-mix(in srgb, var(--panel-line) 60%, transparent); }

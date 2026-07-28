@@ -114,8 +114,12 @@ See `src/scene/scale.ts`.
   toward Earth as the timeline cursor nears each close-approach date, with fading
   trajectory tails; and the **ISS ground track** (sub-satellite path projected to
   the surface) alongside its orbit trail.
-- **Later:** day/night shadow (satellite.js shadow helpers), satellite
-  picking/labels, live "now" auto-advance.
+- **Phase 3.2 (done):** **satellite picking** — click any satellite for a live
+  track dossier (name, NORAD id, altitude, speed, layer); on-screen **tracking
+  labels** that follow the selected satellite and always mark the ISS; and **info
+  tooltips** on each Orbital Traffic layer.
+- **Later:** day/night terminator shadow (satellite.js shadow helpers), a live
+  "now" auto-advancing clock.
 
 ## Credits
 
